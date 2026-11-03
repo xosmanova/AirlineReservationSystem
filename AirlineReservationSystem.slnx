@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Admin/">
+    <Project Path="src/Admin/AirlineReservation.Admin/AirlineReservation.Admin.csproj" />
+  </Folder>
+  <Folder Name="/src/Core/">
+    <Project Path="src/Core/AirlineReservation.Application/AirlineReservation.Application.csproj" />
+    <Project Path="src/Core/AirlineReservation.Domain/AirlineReservation.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/AirlineReservation.Infrastructure/AirlineReservation.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Presentation/">
+    <Project Path="src/Presentation/AirlineReservation.API/AirlineReservation.API.csproj" />
+  </Folder>
+</Solution>
