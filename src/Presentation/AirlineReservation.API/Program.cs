@@ -14,19 +14,22 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Auto-create database & tables on startup
+// Auto-create database & Seed data on startup
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        Console.WriteLine("Connecting to SQL Server and ensuring database is created...");
-        dbContext.Database.EnsureCreated();
-        Console.WriteLine("SUCCESS: SQL Server database and tables created successfully!");
+        Console.WriteLine("Ensuring database is created...");
+        await dbContext.Database.EnsureCreatedAsync();
+
+        Console.WriteLine("Seeding initial aviation data...");
+        await AppDbContextSeed.SeedAsync(dbContext);
+        Console.WriteLine("Database seeded successfully!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"SQL Error: {ex.Message}");
+        Console.WriteLine($"Database seeding error: {ex.Message}");
     }
 }
 
