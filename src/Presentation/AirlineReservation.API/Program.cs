@@ -1,3 +1,5 @@
+using AirlineReservation.API.Middlewares;
+using AirlineReservation.Application.Extensions;
 using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
@@ -7,12 +9,29 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
+// Configure CORS for Client Web App
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowClient", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+// Register Application Services (MediatR CQRS, Riok.Mapperly)
+builder.Services.AddApplicationServices();
+
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+// Global Exception Handling Middleware
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
 // Auto-create database & Seed data on startup
 using (var scope = app.Services.CreateScope())
@@ -40,6 +59,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("AllowClient");
 app.UseAuthorization();
 
 app.MapControllers();

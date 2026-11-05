@@ -72,4 +72,9 @@ public class ApiResponse
     {
         return new ApiResponse(false, message, statusCode, errors);
     }
+
+    public static ApiResponse FailureResult(IReadOnlyList<string> errors, string message = "Validation errors occurred.", int statusCode = 400)
+    {
+        return new ApiResponse(false, message, statusCode, errors);
+    }
 }
