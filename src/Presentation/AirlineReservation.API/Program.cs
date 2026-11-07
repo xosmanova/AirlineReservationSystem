@@ -44,7 +44,7 @@ if (app.Environment.IsDevelopment())
         await dbContext.Database.MigrateAsync();
 
         Console.WriteLine("Seeding initial aviation data...");
-        await AppDbContextSeed.SeedAsync(dbContext);
+        await AppDbContextSeed.SeedAsync(dbContext, app.Configuration, app.Logger);
         Console.WriteLine("Database migrated and seeded successfully!");
     }
     catch (Exception ex)
