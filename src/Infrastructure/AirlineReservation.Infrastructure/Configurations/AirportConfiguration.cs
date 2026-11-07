@@ -15,7 +15,8 @@ public class AirportConfiguration : IEntityTypeConfiguration<Airport>
             .HasMaxLength(3);
 
         builder.HasIndex(a => a.IataCode)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         builder.Property(a => a.Name)
             .IsRequired()

@@ -28,8 +28,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted
-                        && f.DepartureAirportId == departureAirportId
+            .Where(f => f.DepartureAirportId == departureAirportId
                         && f.ArrivalAirportId == arrivalAirportId
                         && f.DepartureTimeUtc.Date == targetDate
                         && f.Status == FlightStatus.Scheduled)
@@ -50,7 +49,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
                 .ThenInclude(t => t.Seat)
             .Include(f => f.Tickets)
                 .ThenInclude(t => t.Passenger)
-            .FirstOrDefaultAsync(f => f.Id == flightId && !f.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(f => f.Id == flightId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default)
@@ -60,8 +59,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted
-                        && f.DepartureTimeUtc >= DateTime.UtcNow
+            .Where(f => f.DepartureTimeUtc >= DateTime.UtcNow
                         && f.Status == FlightStatus.Scheduled)
             .OrderBy(f => f.DepartureTimeUtc)
             .Take(count)
@@ -76,7 +74,6 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted)
             .OrderByDescending(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);

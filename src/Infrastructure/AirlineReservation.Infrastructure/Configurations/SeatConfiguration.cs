@@ -24,7 +24,8 @@ public class SeatConfiguration : IEntityTypeConfiguration<Seat>
 
         // A seat number must be unique within a given aircraft
         builder.HasIndex(s => new { s.AircraftId, s.SeatNumber })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         builder.HasOne(s => s.Aircraft)
             .WithMany(a => a.Seats)

@@ -33,7 +33,7 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
                 .ThenInclude(t => t.Seat)
             .Include(b => b.Tickets)
                 .ThenInclude(t => t.Passenger)
-            .FirstOrDefaultAsync(b => b.PnrCode.ToUpper() == normalizedPnr && !b.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(string userId, CancellationToken cancellationToken = default)
@@ -49,7 +49,7 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
             .Include(b => b.Tickets)
                 .ThenInclude(t => t.Flight)
                     .ThenInclude(f => f.Airline)
-            .Where(b => b.UserId == userId && !b.IsDeleted)
+            .Where(b => b.UserId == userId)
             .OrderByDescending(b => b.CreatedAt)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -63,7 +63,6 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
                 .ThenInclude(t => t.Flight)
             .Include(b => b.Tickets)
                 .ThenInclude(t => t.Passenger)
-            .Where(b => !b.IsDeleted)
             .OrderByDescending(b => b.CreatedAt)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -72,6 +71,6 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
     public async Task<bool> PnrExistsAsync(string pnrCode, CancellationToken cancellationToken = default)
     {
         var normalizedPnr = pnrCode.Trim().ToUpper();
-        return await _dbSet.AnyAsync(b => b.PnrCode.ToUpper() == normalizedPnr && !b.IsDeleted, cancellationToken);
+        return await _dbSet.AnyAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
     }
 }

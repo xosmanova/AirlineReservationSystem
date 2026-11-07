@@ -14,3 +14,14 @@ A modern airline reservation and flight operations management platform.
 - `src/Presentation/` — Central RESTful Web API
 - `src/Admin/` — ASP.NET Core MVC management portal
 - `src/Client/` — Customer web application
+
+### Database Migrations Workflow
+To verify model synchronization against the migration snapshot (must exit 0):
+```powershell
+dotnet ef migrations has-pending-model-changes --project src/Infrastructure/AirlineReservation.Infrastructure --startup-project src/Presentation/AirlineReservation.API
+```
+
+To add a new migration:
+```powershell
+dotnet ef migrations add <MigrationName> --project src/Infrastructure/AirlineReservation.Infrastructure --startup-project src/Presentation/AirlineReservation.API
+```
