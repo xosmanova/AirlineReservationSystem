@@ -31,9 +31,9 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Where(f => !f.IsDeleted
                         && f.DepartureAirportId == departureAirportId
                         && f.ArrivalAirportId == arrivalAirportId
-                        && f.DepartureTime.Date == targetDate
+                        && f.DepartureTimeUtc.Date == targetDate
                         && f.Status == FlightStatus.Scheduled)
-            .OrderBy(f => f.DepartureTime)
+            .OrderBy(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -61,9 +61,9 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
             .Where(f => !f.IsDeleted
-                        && f.DepartureTime >= DateTime.UtcNow
+                        && f.DepartureTimeUtc >= DateTime.UtcNow
                         && f.Status == FlightStatus.Scheduled)
-            .OrderBy(f => f.DepartureTime)
+            .OrderBy(f => f.DepartureTimeUtc)
             .Take(count)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -77,7 +77,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
             .Where(f => !f.IsDeleted)
-            .OrderByDescending(f => f.DepartureTime)
+            .OrderByDescending(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }

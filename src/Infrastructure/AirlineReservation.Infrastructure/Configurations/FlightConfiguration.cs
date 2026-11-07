@@ -38,6 +38,6 @@ public class FlightConfiguration : IEntityTypeConfiguration<Flight>
             .OnDelete(DeleteBehavior.Restrict);
 
         // Performance indexes for flight search
-        builder.HasIndex(f => new { f.DepartureAirportId, f.ArrivalAirportId, f.DepartureTime });
+        builder.HasIndex(f => new { f.DepartureAirportId, f.ArrivalAirportId, f.DepartureTimeUtc });
     }
 }

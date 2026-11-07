@@ -131,8 +131,8 @@ public static class AppDbContextSeed
                     AircraftId = a320.Id,
                     DepartureAirportId = gyd.Id,
                     ArrivalAirportId = ist.Id,
-                    DepartureTime = flightDate.AddHours(8).AddMinutes(30),
-                    ArrivalTime = flightDate.AddHours(10).AddMinutes(45),
+                    DepartureTimeUtc = flightDate.AddHours(8).AddMinutes(30),
+                    ArrivalTimeUtc = flightDate.AddHours(10).AddMinutes(45),
                     BasePrice = 185.00m,
                     Status = FlightStatus.Scheduled
                 });
@@ -145,8 +145,8 @@ public static class AppDbContextSeed
                     AircraftId = a320.Id,
                     DepartureAirportId = ist.Id,
                     ArrivalAirportId = gyd.Id,
-                    DepartureTime = flightDate.AddHours(12).AddMinutes(15),
-                    ArrivalTime = flightDate.AddHours(16).AddMinutes(20),
+                    DepartureTimeUtc = flightDate.AddHours(12).AddMinutes(15),
+                    ArrivalTimeUtc = flightDate.AddHours(16).AddMinutes(20),
                     BasePrice = 185.00m,
                     Status = FlightStatus.Scheduled
                 });
@@ -159,8 +159,8 @@ public static class AppDbContextSeed
                     AircraftId = b777.Id,
                     DepartureAirportId = gyd.Id,
                     ArrivalAirportId = dxb.Id,
-                    DepartureTime = flightDate.AddHours(16).AddMinutes(45),
-                    ArrivalTime = flightDate.AddHours(19).AddMinutes(50),
+                    DepartureTimeUtc = flightDate.AddHours(16).AddMinutes(45),
+                    ArrivalTimeUtc = flightDate.AddHours(19).AddMinutes(50),
                     BasePrice = 260.00m,
                     Status = FlightStatus.Scheduled
                 });
@@ -173,8 +173,8 @@ public static class AppDbContextSeed
                     AircraftId = b777.Id,
                     DepartureAirportId = dxb.Id,
                     ArrivalAirportId = gyd.Id,
-                    DepartureTime = flightDate.AddHours(21).AddMinutes(10),
-                    ArrivalTime = flightDate.AddDays(1).AddHours(0).AddMinutes(25),
+                    DepartureTimeUtc = flightDate.AddHours(21).AddMinutes(10),
+                    ArrivalTimeUtc = flightDate.AddDays(1).AddHours(0).AddMinutes(25),
                     BasePrice = 260.00m,
                     Status = FlightStatus.Scheduled
                 });
@@ -187,8 +187,8 @@ public static class AppDbContextSeed
                     AircraftId = b737.Id,
                     DepartureAirportId = ist.Id,
                     ArrivalAirportId = jfk.Id,
-                    DepartureTime = flightDate.AddHours(6).AddMinutes(50),
-                    ArrivalTime = flightDate.AddHours(11).AddMinutes(35),
+                    DepartureTimeUtc = flightDate.AddHours(6).AddMinutes(50),
+                    ArrivalTimeUtc = flightDate.AddHours(11).AddMinutes(35),
                     BasePrice = 640.00m,
                     Status = FlightStatus.Scheduled
                 });
@@ -201,8 +201,8 @@ public static class AppDbContextSeed
                     AircraftId = b737.Id,
                     DepartureAirportId = lhr.Id,
                     ArrivalAirportId = fra.Id,
-                    DepartureTime = flightDate.AddHours(10).AddMinutes(20),
-                    ArrivalTime = flightDate.AddHours(13).AddMinutes(00),
+                    DepartureTimeUtc = flightDate.AddHours(10).AddMinutes(20),
+                    ArrivalTimeUtc = flightDate.AddHours(13).AddMinutes(00),
                     BasePrice = 145.00m,
                     Status = FlightStatus.Scheduled
                 });
