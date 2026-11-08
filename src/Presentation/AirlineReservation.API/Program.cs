@@ -1,10 +1,15 @@
 using AirlineReservation.API.Middlewares;
+using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Extensions;
 using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Fail-fast validation of configured business time zone
+var configuredTimeZone = builder.Configuration["Business:TimeZone"] ?? "Asia/Baku";
+TimeZoneHelper.ResolveTimeZone(configuredTimeZone);
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -20,7 +25,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register Application Services (MediatR CQRS, Riok.Mapperly)
+// Register Application Services (MediatR CQRS, Riok.Mapperly, IBusinessTime)
 builder.Services.AddApplicationServices();
 
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work)
@@ -59,8 +64,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
 app.UseCors("AllowClient");
+
 app.UseAuthorization();
 
 app.MapControllers();

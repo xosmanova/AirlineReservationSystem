@@ -10,7 +10,17 @@ public interface IFlightRepository : IGenericRepository<Flight>
     Task<IReadOnlyList<Flight>> SearchFlightsAsync(
         int departureAirportId,
         int arrivalAirportId,
-        DateTime departureDate,
+        DateTime startUtc,
+        DateTime endUtc,
+        DateTime nowUtc,
+        decimal? minPrice = null,
+        decimal? maxPrice = null,
+        int? airlineId = null,
+        int? maxStops = null,
+        string? sortBy = null,
+        string? sortDirection = null,
+        int page = 1,
+        int pageSize = 10,
         CancellationToken cancellationToken = default);
 
     Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default);
