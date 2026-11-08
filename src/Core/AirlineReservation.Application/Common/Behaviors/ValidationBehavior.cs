@@ -1,12 +1,13 @@
+using AirlineReservation.Application.Common.Exceptions;
 using FluentValidation;
 using MediatR;
-using ValidationException = AirlineReservation.Application.Common.Exceptions.ValidationException;
 
 namespace AirlineReservation.Application.Common.Behaviors;
 
 /// <summary>
 /// MediatR pipeline behavior that automatically executes all registered FluentValidation
 /// validators for the incoming request before it reaches the handler.
+/// Throws AppValidationException if validation fails.
 /// </summary>
 public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
@@ -41,7 +42,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
                     .GroupBy(e => e.PropertyName, e => e.ErrorMessage)
                     .ToDictionary(group => group.Key, group => group.ToArray());
 
-                throw new ValidationException(errors);
+                throw new AppValidationException(errors);
             }
         }
 

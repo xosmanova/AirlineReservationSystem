@@ -28,12 +28,11 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted
-                        && f.DepartureAirportId == departureAirportId
+            .Where(f => f.DepartureAirportId == departureAirportId
                         && f.ArrivalAirportId == arrivalAirportId
-                        && f.DepartureTime.Date == targetDate
+                        && f.DepartureTimeUtc.Date == targetDate
                         && f.Status == FlightStatus.Scheduled)
-            .OrderBy(f => f.DepartureTime)
+            .OrderBy(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -50,7 +49,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
                 .ThenInclude(t => t.Seat)
             .Include(f => f.Tickets)
                 .ThenInclude(t => t.Passenger)
-            .FirstOrDefaultAsync(f => f.Id == flightId && !f.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(f => f.Id == flightId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default)
@@ -60,10 +59,9 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted
-                        && f.DepartureTime >= DateTime.UtcNow
+            .Where(f => f.DepartureTimeUtc >= DateTime.UtcNow
                         && f.Status == FlightStatus.Scheduled)
-            .OrderBy(f => f.DepartureTime)
+            .OrderBy(f => f.DepartureTimeUtc)
             .Take(count)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -76,8 +74,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => !f.IsDeleted)
-            .OrderByDescending(f => f.DepartureTime)
+            .OrderByDescending(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }

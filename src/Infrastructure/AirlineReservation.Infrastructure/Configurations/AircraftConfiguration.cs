@@ -19,7 +19,8 @@ public class AircraftConfiguration : IEntityTypeConfiguration<Aircraft>
             .HasMaxLength(20);
 
         builder.HasIndex(a => a.TailNumber)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         builder.HasOne(a => a.Airline)
             .WithMany(al => al.Aircrafts)

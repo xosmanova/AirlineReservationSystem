@@ -19,4 +19,7 @@ public class Ticket : BaseEntity
     public Seat Seat { get; set; } = null!;
 
     public decimal Price { get; set; }
+
+    public bool IsCancelled { get; set; } = false;
+    public DateTime? CancelledAtUtc { get; set; }
 }

@@ -13,4 +13,7 @@
   <Folder Name="/src/Presentation/">
     <Project Path="src/Presentation/AirlineReservation.API/AirlineReservation.API.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AirlineReservation.Application.Tests/AirlineReservation.Application.Tests.csproj" />
+  </Folder>
 </Solution>

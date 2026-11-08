@@ -1,4 +1,6 @@
+using AirlineReservation.Application.Common.Helpers;
 using FluentValidation;
+using Microsoft.Extensions.Configuration;
 
 namespace AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 
@@ -6,13 +8,17 @@ namespace AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 /// FluentValidation rules for flight search query.
 /// Enforces business rules:
 /// - Departure and arrival airports must be different.
-/// - Departure date cannot be in the past.
+/// - Departure date cannot be in the past (timezone-aware relative to Asia/Baku).
 /// - Minimum passenger count.
 /// </summary>
 public class SearchFlightsQueryValidator : AbstractValidator<SearchFlightsQuery>
 {
-    public SearchFlightsQueryValidator()
+    public SearchFlightsQueryValidator(TimeProvider? timeProvider = null, IConfiguration? configuration = null)
     {
+        var provider = timeProvider ?? TimeProvider.System;
+        var timeZoneId = configuration?["Business:TimeZone"] ?? "Asia/Baku";
+        var timeZone = TimeZoneHelper.ResolveTimeZone(timeZoneId);
+
         RuleFor(x => x.DepartureAirportId)
             .GreaterThan(0)
             .WithMessage("Departure airport is required.");
@@ -28,7 +34,7 @@ public class SearchFlightsQueryValidator : AbstractValidator<SearchFlightsQuery>
         RuleFor(x => x.DepartureDate)
             .NotEmpty()
             .WithMessage("Departure date is required.")
-            .Must(date => date.Date >= DateTime.UtcNow.Date)
+            .Must(date => date.Date >= TimeZoneHelper.GetTodayInTimeZone(provider, timeZone))
             .WithMessage("Departure date cannot be in the past.");
 
         RuleFor(x => x.PassengersCount)
