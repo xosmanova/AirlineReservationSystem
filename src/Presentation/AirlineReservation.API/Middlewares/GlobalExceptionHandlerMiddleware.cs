@@ -43,7 +43,7 @@ public class GlobalExceptionHandlerMiddleware
                 (int)HttpStatusCode.NotFound,
                 ApiResponse.FailureResult(notFoundEx.Message, statusCode: (int)HttpStatusCode.NotFound)
             ),
-            ValidationException validationEx => (
+            AppValidationException validationEx => (
                 (int)HttpStatusCode.BadRequest,
                 ApiResponse.FailureResult(
                     validationEx.Errors.Values.SelectMany(errs => errs).ToList(),

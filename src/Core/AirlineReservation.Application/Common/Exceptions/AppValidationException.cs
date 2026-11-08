@@ -1,26 +1,26 @@
 namespace AirlineReservation.Application.Common.Exceptions;
 
 /// <summary>
-/// Exception thrown when one or more business validation rules fail.
-/// Maps to HTTP 400 Bad Request with structured error list.
+/// Exception thrown when one or more application validation rules fail.
+/// Renamed to AppValidationException to avoid naming collision with FluentValidation.ValidationException.
 /// </summary>
-public class ValidationException : Exception
+public class AppValidationException : Exception
 {
     public IDictionary<string, string[]> Errors { get; }
 
-    public ValidationException()
+    public AppValidationException()
         : base("One or more validation failures have occurred.")
     {
         Errors = new Dictionary<string, string[]>();
     }
 
-    public ValidationException(IDictionary<string, string[]> errors)
+    public AppValidationException(IDictionary<string, string[]> errors)
         : base("One or more validation failures have occurred.")
     {
         Errors = errors;
     }
 
-    public ValidationException(string propertyName, string errorMessage)
+    public AppValidationException(string propertyName, string errorMessage)
         : base("One or more validation failures have occurred.")
     {
         Errors = new Dictionary<string, string[]>
