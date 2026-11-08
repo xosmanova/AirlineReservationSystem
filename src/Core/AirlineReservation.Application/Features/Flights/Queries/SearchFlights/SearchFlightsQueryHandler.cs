@@ -1,3 +1,4 @@
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Mappings;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.Contracts.Persistence;
@@ -9,30 +10,47 @@ namespace AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 
 /// <summary>
 /// CQRS Query Handler for flight search.
-/// Applies search filters, calculates real-time seat availability, and projects to DTOs.
+/// Applies search filters with timezone-aware boundaries, calculates real-time seat availability, and projects to DTOs.
 /// </summary>
 public class SearchFlightsQueryHandler : IRequestHandler<SearchFlightsQuery, ApiResponse<IReadOnlyList<FlightDto>>>
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly AirlineMappingProfile _mapper;
+    private readonly IBusinessTime _businessTime;
+    private readonly TimeProvider _timeProvider;
 
-    public SearchFlightsQueryHandler(IUnitOfWork unitOfWork, AirlineMappingProfile mapper)
+    public SearchFlightsQueryHandler(
+        IUnitOfWork unitOfWork,
+        AirlineMappingProfile mapper,
+        IBusinessTime businessTime,
+        TimeProvider? timeProvider = null)
     {
-        _unitOfWork = unitOfWork;
-        _mapper = mapper;
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+        _businessTime = businessTime ?? throw new ArgumentNullException(nameof(businessTime));
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<ApiResponse<IReadOnlyList<FlightDto>>> Handle(SearchFlightsQuery request, CancellationToken cancellationToken)
     {
+        var startUtc = _businessTime.StartOfLocalDayUtc(request.DepartureDate);
+        var endUtc = _businessTime.EndOfLocalDayUtc(request.DepartureDate);
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+
         var flights = await _unitOfWork.Flights.SearchFlightsAsync(
             request.DepartureAirportId,
             request.ArrivalAirportId,
-            request.DepartureDate,
+            startUtc,
+            endUtc,
+            nowUtc,
+            request.MinPrice,
             request.MaxPrice,
             request.AirlineId,
             request.MaxStops,
             request.SortBy,
             request.SortDirection,
+            request.Page,
+            request.PageSize,
             cancellationToken);
 
         int requiredPassengers = request.PassengersCount.GetValueOrDefault(1);
@@ -68,7 +86,7 @@ public class SearchFlightsQueryHandler : IRequestHandler<SearchFlightsQuery, Api
         return ApiResponse<IReadOnlyList<FlightDto>>.SuccessResult(
             resultList,
             resultList.Count > 0
-                ? $"Found {resultList.Count} available flight(s)."
-                : "No available flights found matching your search criteria.");
+                ? $"Found {resultList.Count} flight(s) matching your criteria."
+                : "No flights found matching the specified search criteria.");
     }
 }

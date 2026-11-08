@@ -1,4 +1,7 @@
+using AirlineReservation.Application.Common.Helpers;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Mappings;
+using AirlineReservation.Application.Common.Services;
 using AirlineReservation.Application.DTOs.Passenger;
 using AirlineReservation.Application.Validators;
 using Xunit;
@@ -7,8 +10,15 @@ namespace AirlineReservation.Application.Tests.Validators;
 
 public class PassengerValidatorTests
 {
-    private readonly PassengerValidator _validator = new(TimeProvider.System);
+    private static readonly TimeZoneInfo BakuTimeZone = TimeZoneHelper.ResolveTimeZone("Asia/Baku");
+    private readonly IBusinessTime _businessTime = new BusinessTimeService(TimeProvider.System, BakuTimeZone);
+    private readonly PassengerValidator _validator;
     private readonly AirlineMappingProfile _mapper = new();
+
+    public PassengerValidatorTests()
+    {
+        _validator = new PassengerValidator(_businessTime);
+    }
 
     [Theory]
     [InlineData("Əli", "Məmmədov")]
@@ -88,6 +98,29 @@ public class PassengerValidatorTests
         var entity = _mapper.ToEntity(dto);
 
         // Assert
+        Assert.Equal(expectedPassport, entity.PassportNumber);
+    }
+
+    [Theory]
+    [InlineData(" aze123456 ", "AZE123456")]
+    [InlineData("  C02345678  ", "C02345678")]
+    public void Validator_AcceptsPassportWithSurroundingWhitespace_AndNormalizes(string rawPassport, string expectedPassport)
+    {
+        var dto = new PassengerCreateDto
+        {
+            FirstName = "Əli",
+            LastName = "Məmmədov",
+            PassportNumber = rawPassport,
+            DateOfBirth = new DateTime(1990, 1, 1),
+            Email = "ali@example.com",
+            PhoneNumber = "+994501234567",
+            SeatId = 1
+        };
+
+        var validationResult = _validator.Validate(dto);
+        Assert.True(validationResult.IsValid, $"Passport '{rawPassport}' with whitespace should pass validation.");
+
+        var entity = _mapper.ToEntity(dto);
         Assert.Equal(expectedPassport, entity.PassportNumber);
     }
 

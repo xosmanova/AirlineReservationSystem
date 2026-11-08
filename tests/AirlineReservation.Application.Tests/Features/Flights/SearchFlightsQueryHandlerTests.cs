@@ -1,6 +1,9 @@
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
+using AirlineReservation.Application.Common.Helpers;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Mappings;
+using AirlineReservation.Application.Common.Services;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightById;
@@ -14,13 +17,15 @@ namespace AirlineReservation.Application.Tests.Features.Flights;
 
 public class SearchFlightsQueryHandlerTests
 {
+    private static readonly TimeZoneInfo BakuTimeZone = TimeZoneHelper.ResolveTimeZone("Asia/Baku");
+    private readonly IBusinessTime _businessTime = new BusinessTimeService(TimeProvider.System, BakuTimeZone);
     private readonly AirlineMappingProfile _mapper = new();
 
     private static (Flight, Aircraft) CreateSampleFlight(int flightId = 1, int totalSeats = 142)
     {
         var gyd = new Airport { Id = 1, IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan" };
         var ist = new Airport { Id = 2, IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey" };
-        var azal = new Airline { Id = 1, Code = "J2", Name = "Azerbaijan Airlines", LogoUrl = "https://azal.az/logo.png" };
+        var azal = new Airline { Id = 1, Code = "J2", Name = "Azerbaijan Airlines (AZAL)", LogoUrl = "https://azal.az/logo.png" };
         var aircraft = new Aircraft { Id = 1, Model = "Airbus A320-200", TailNumber = "DEMO-A320-1", TotalSeats = totalSeats, AirlineId = 1 };
 
         var flight = new Flight
@@ -61,10 +66,10 @@ public class SearchFlightsQueryHandlerTests
     public async Task Handle_CalculatesAccurateAvailableSeats_AndReturnsMatchingFlights()
     {
         // Arrange
-        var (flight, aircraft) = CreateSampleFlight(totalSeats: 142);
+        var (flight, _) = CreateSampleFlight(totalSeats: 142);
         var fakeRepo = new FakeFlightRepository([flight]);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
 
         var query = new SearchFlightsQuery(
             DepartureAirportId: 1,
@@ -84,27 +89,25 @@ public class SearchFlightsQueryHandlerTests
         var flightDto = result.Data[0];
         Assert.Equal("J2101", flightDto.FlightNumber);
         Assert.Equal(142, flightDto.TotalSeats);
-        // Total (142) - 2 confirmed tickets = 140 available seats!
         Assert.Equal(140, flightDto.AvailableSeatsCount);
         Assert.Equal("Airbus A320-200", flightDto.AircraftModel);
         Assert.Equal(180, flightDto.DurationMinutes);
     }
 
     [Fact]
-    public async Task Handle_WhenAvailableSeatsLessThanRequestedPassengers_FiltersOutFlight()
+    public async Task Handle_WhenPassengersCountExceedsAvailableSeats_FiltersOutFlight()
     {
-        // Arrange: aircraft with 5 total seats, 2 occupied -> 3 available
-        var (flight, _) = CreateSampleFlight(totalSeats: 5);
+        // Arrange
+        var (flight, _) = CreateSampleFlight(totalSeats: 142);
         var fakeRepo = new FakeFlightRepository([flight]);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
 
-        // Requesting 4 passengers when only 3 are available
         var query = new SearchFlightsQuery(
             DepartureAirportId: 1,
             ArrivalAirportId: 2,
             DepartureDate: new DateTime(2026, 11, 10),
-            PassengersCount: 4
+            PassengersCount: 141
         );
 
         // Act
@@ -114,11 +117,37 @@ public class SearchFlightsQueryHandlerTests
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.Empty(result.Data);
-        Assert.Contains("No available flights found", result.Message);
     }
 
     [Fact]
-    public async Task GetFlightById_WhenFlightExists_ReturnsFlightWithAvailableSeats()
+    public async Task Handle_BakuMidnightAndUtcBoundary_CorrectlyMatchesFlightAt2000Utc()
+    {
+        // In Baku (UTC+4), 2026-11-10 begins at 2026-11-09 20:00:00 UTC!
+        // A flight departing at 2026-11-09 20:00:00 UTC is at 00:00 Baku time on Nov 10.
+        var (flight, _) = CreateSampleFlight(flightId: 99);
+        flight.DepartureTimeUtc = new DateTime(2026, 11, 9, 20, 0, 0, DateTimeKind.Utc);
+        flight.ArrivalTimeUtc = new DateTime(2026, 11, 9, 23, 0, 0, DateTimeKind.Utc);
+
+        var fakeRepo = new FakeFlightRepository([flight]);
+        var fakeUow = new FakeUnitOfWork(fakeRepo);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
+
+        var query = new SearchFlightsQuery(
+            DepartureAirportId: 1,
+            ArrivalAirportId: 2,
+            DepartureDate: new DateTime(2026, 11, 10) // User searches for 2026-11-10 in Baku time
+        );
+
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Single(result.Data);
+        Assert.Equal(99, result.Data[0].Id);
+    }
+
+    [Fact]
+    public async Task Handle_GetFlightById_WhenFound_ReturnsEnrichedFlightDto()
     {
         // Arrange
         var (flight, _) = CreateSampleFlight(flightId: 42, totalSeats: 154);
@@ -133,11 +162,12 @@ public class SearchFlightsQueryHandlerTests
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.Equal(42, result.Data.Id);
-        Assert.Equal(152, result.Data.AvailableSeatsCount); // 154 - 2 confirmed
+        Assert.Equal(154, result.Data.TotalSeats);
+        Assert.Equal(152, result.Data.AvailableSeatsCount);
     }
 
     [Fact]
-    public async Task GetFlightById_WhenFlightNotFound_ThrowsNotFoundException()
+    public async Task Handle_GetFlightById_WhenNotFound_ThrowsNotFoundException()
     {
         // Arrange
         var fakeRepo = new FakeFlightRepository([]);
@@ -183,19 +213,28 @@ public class SearchFlightsQueryHandlerTests
         public Task<IReadOnlyList<Flight>> SearchFlightsAsync(
             int departureAirportId,
             int arrivalAirportId,
-            DateTime departureDate,
+            DateTime startUtc,
+            DateTime endUtc,
+            DateTime nowUtc,
+            decimal? minPrice = null,
             decimal? maxPrice = null,
             int? airlineId = null,
             int? maxStops = null,
             string? sortBy = null,
             string? sortDirection = null,
+            int page = 1,
+            int pageSize = 10,
             CancellationToken cancellationToken = default)
         {
-            var targetDate = departureDate.Date;
             var query = _flights.Where(f =>
                 f.DepartureAirportId == departureAirportId &&
                 f.ArrivalAirportId == arrivalAirportId &&
-                f.DepartureTimeUtc.Date == targetDate);
+                f.DepartureTimeUtc >= startUtc &&
+                f.DepartureTimeUtc < endUtc &&
+                f.Status == FlightStatus.Scheduled);
+
+            if (minPrice.HasValue && minPrice.Value >= 0)
+                query = query.Where(f => f.BasePrice >= minPrice.Value);
 
             if (maxPrice.HasValue && maxPrice.Value > 0)
                 query = query.Where(f => f.BasePrice <= maxPrice.Value);

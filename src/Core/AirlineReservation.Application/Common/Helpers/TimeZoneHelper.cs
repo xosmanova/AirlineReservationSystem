@@ -4,10 +4,16 @@ public static class TimeZoneHelper
 {
     /// <summary>
     /// Resolves an IANA or Windows time zone ID safely across operating systems.
-    /// E.g. "Asia/Baku" is resolved directly or mapped to "Azerbaijan Standard Time" on Windows.
+    /// E.g. "Asia/Baku" is resolved directly on Linux/macOS or mapped to "Azerbaijan Standard Time" on Windows.
+    /// Fails fast if the time zone cannot be resolved (no silent UTC fallback).
     /// </summary>
     public static TimeZoneInfo ResolveTimeZone(string timeZoneId)
     {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            throw new ArgumentException("Time zone ID cannot be null or empty.", nameof(timeZoneId));
+        }
+
         try
         {
             return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
@@ -18,7 +24,9 @@ public static class TimeZoneHelper
             {
                 return TimeZoneInfo.FindSystemTimeZoneById(windowsId);
             }
-            return TimeZoneInfo.Utc;
+
+            throw new InvalidOperationException(
+                $"Business time zone '{timeZoneId}' could not be resolved on this operating system. Please check configuration.");
         }
     }
 

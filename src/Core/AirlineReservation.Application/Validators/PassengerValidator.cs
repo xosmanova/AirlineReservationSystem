@@ -1,40 +1,42 @@
-using AirlineReservation.Application.Common.Helpers;
+using System.Text.RegularExpressions;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.DTOs.Passenger;
 using FluentValidation;
-using Microsoft.Extensions.Configuration;
 
 namespace AirlineReservation.Application.Validators;
 
 /// <summary>
 /// FluentValidation rules for passenger details.
 /// Supports international and Azerbaijani unicode names (Ə, ö, ü, ç, ş, ğ, ı),
-/// case-insensitive passport numbers, and timezone-aware DateOfBirth validation.
+/// whitespace-tolerant and case-insensitive passport numbers, and timezone-aware DateOfBirth validation.
 /// </summary>
 public class PassengerValidator : AbstractValidator<PassengerCreateDto>
 {
-    private const string NameRegex = @"^[\p{L}\s\-']+$";
-    private const string PassportRegex = @"^[a-zA-Z0-9]{6,12}$";
-    private const string PhoneRegex = @"^\+?[0-9\s\-()]{7,20}$";
+    private static readonly Regex NameRegex = new(@"^[\p{L}\s\-']+$", RegexOptions.Compiled);
+    private static readonly Regex PassportRegex = new(@"^[a-zA-Z0-9]{6,12}$", RegexOptions.Compiled);
+    private static readonly Regex PhoneRegex = new(@"^\+?[0-9\s\-()]{7,20}$", RegexOptions.Compiled);
 
-    public PassengerValidator(TimeProvider? timeProvider = null, IConfiguration? configuration = null)
+    public PassengerValidator(IBusinessTime businessTime)
     {
-        var provider = timeProvider ?? TimeProvider.System;
-        var timeZoneId = configuration?["Business:TimeZone"] ?? "Asia/Baku";
-        var timeZone = TimeZoneHelper.ResolveTimeZone(timeZoneId);
+        ArgumentNullException.ThrowIfNull(businessTime);
 
         RuleFor(x => x.FirstName)
             .NotEmpty().WithMessage("First name is required.")
             .MaximumLength(50).WithMessage("First name cannot exceed 50 characters.")
-            .Matches(NameRegex).WithMessage("First name can only contain letters, spaces, hyphens, or apostrophes.");
+            .Must(name => !string.IsNullOrWhiteSpace(name) && NameRegex.IsMatch(name))
+            .WithMessage("First name can only contain letters, spaces, hyphens, or apostrophes.");
 
         RuleFor(x => x.LastName)
             .NotEmpty().WithMessage("Last name is required.")
             .MaximumLength(50).WithMessage("Last name cannot exceed 50 characters.")
-            .Matches(NameRegex).WithMessage("Last name can only contain letters, spaces, hyphens, or apostrophes.");
+            .Must(name => !string.IsNullOrWhiteSpace(name) && NameRegex.IsMatch(name))
+            .WithMessage("Last name can only contain letters, spaces, hyphens, or apostrophes.");
 
         RuleFor(x => x.PassportNumber)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Passport number is required.")
-            .Matches(PassportRegex).WithMessage("Passport number must be 6 to 12 alphanumeric characters.");
+            .Must(p => !string.IsNullOrWhiteSpace(p) && PassportRegex.IsMatch(p.Trim()))
+            .WithMessage("Passport number must be 6 to 12 alphanumeric characters.");
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email address is required.")
@@ -42,13 +44,14 @@ public class PassengerValidator : AbstractValidator<PassengerCreateDto>
 
         RuleFor(x => x.PhoneNumber)
             .NotEmpty().WithMessage("Phone number is required.")
-            .Matches(PhoneRegex).WithMessage("A valid contact phone number is required.");
+            .Must(phone => !string.IsNullOrWhiteSpace(phone) && PhoneRegex.IsMatch(phone))
+            .WithMessage("A valid contact phone number is required.");
 
         RuleFor(x => x.DateOfBirth)
             .NotEmpty().WithMessage("Date of birth is required.")
             .Must(dob =>
             {
-                var today = TimeZoneHelper.GetTodayInTimeZone(provider, timeZone);
+                var today = businessTime.TodayLocal;
                 var dobDate = dob.Date;
                 return dobDate <= today && dobDate >= today.AddYears(-120);
             })

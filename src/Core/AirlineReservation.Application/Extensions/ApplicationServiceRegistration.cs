@@ -1,6 +1,8 @@
 using System.Reflection;
 using AirlineReservation.Application.Common.Behaviors;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Mappings;
+using AirlineReservation.Application.Common.Services;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,13 +10,19 @@ using Microsoft.Extensions.DependencyInjection;
 namespace AirlineReservation.Application.Extensions;
 
 /// <summary>
-/// Service registration extensions for Application layer dependencies (MediatR, FluentValidation, Mapperly).
+/// Service registration extensions for Application layer dependencies (MediatR, FluentValidation, Mapperly, BusinessTime).
 /// </summary>
 public static class ApplicationServiceRegistration
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         var assembly = Assembly.GetExecutingAssembly();
+
+        // Register default TimeProvider
+        services.AddSingleton(TimeProvider.System);
+
+        // Register IBusinessTime for unified timezone-aware day boundary calculations
+        services.AddSingleton<IBusinessTime, BusinessTimeService>();
 
         // Register MediatR handlers and validation pipeline behavior
         services.AddMediatR(cfg =>

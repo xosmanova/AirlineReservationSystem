@@ -8,6 +8,8 @@ namespace AirlineReservation.Infrastructure.Repositories;
 
 /// <summary>
 /// Specialized repository implementation for Flight operations.
+/// Utilizes composite index IX_Flights_DepartureAirportId_ArrivalAirportId_DepartureTimeUtc.
+/// Eager-loads all navigation properties to prevent N+1 query issues.
 /// </summary>
 public class FlightRepository : GenericRepository<Flight>, IFlightRepository
 {
@@ -18,18 +20,21 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
     public async Task<IReadOnlyList<Flight>> SearchFlightsAsync(
         int departureAirportId,
         int arrivalAirportId,
-        DateTime departureDate,
+        DateTime startUtc,
+        DateTime endUtc,
+        DateTime nowUtc,
+        decimal? minPrice = null,
         decimal? maxPrice = null,
         int? airlineId = null,
         int? maxStops = null,
         string? sortBy = null,
         string? sortDirection = null,
+        int page = 1,
+        int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var targetDate = departureDate.Date;
-        var nextDate = targetDate.AddDays(1);
-
-        // Uses composite index IX_Flights_DepartureAirportId_ArrivalAirportId_DepartureTimeUtc
+        // Composite index sargable query with exact UTC range bounds
+        // Excludes departed flights and cancelled flights
         var query = _dbSet
             .Include(f => f.Airline)
             .Include(f => f.Aircraft)
@@ -39,9 +44,16 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
                 .ThenInclude(t => t.Booking)
             .Where(f => f.DepartureAirportId == departureAirportId
                         && f.ArrivalAirportId == arrivalAirportId
-                        && f.DepartureTimeUtc >= targetDate
-                        && f.DepartureTimeUtc < nextDate
+                        && f.DepartureTimeUtc >= startUtc
+                        && f.DepartureTimeUtc < endUtc
+                        && f.DepartureTimeUtc > nowUtc
                         && f.Status == FlightStatus.Scheduled);
+
+        // Optional filter: Min price
+        if (minPrice.HasValue && minPrice.Value >= 0)
+        {
+            query = query.Where(f => f.BasePrice >= minPrice.Value);
+        }
 
         // Optional filter: Max price
         if (maxPrice.HasValue && maxPrice.Value > 0)
@@ -61,14 +73,23 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             query = query.Where(f => f.Stops <= maxStops.Value);
         }
 
-        // Sorting
+        // Sorting (departure, price, duration)
         bool isDescending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
 
         query = sortBy?.ToLowerInvariant() switch
         {
             "price" => isDescending ? query.OrderByDescending(f => f.BasePrice) : query.OrderBy(f => f.BasePrice),
+            "duration" => isDescending
+                ? query.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc))
+                : query.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)),
             _ => isDescending ? query.OrderByDescending(f => f.DepartureTimeUtc) : query.OrderBy(f => f.DepartureTimeUtc)
         };
+
+        // Pagination
+        if (page > 0 && pageSize > 0)
+        {
+            query = query.Skip((page - 1) * pageSize).Take(pageSize);
+        }
 
         return await query.AsNoTracking().ToListAsync(cancellationToken);
     }
@@ -90,13 +111,13 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
 
     public async Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
         return await _dbSet
             .Include(f => f.Airline)
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => f.DepartureTimeUtc >= DateTime.UtcNow
-                        && f.Status == FlightStatus.Scheduled)
+            .Where(f => f.DepartureTimeUtc >= now && f.Status == FlightStatus.Scheduled)
             .OrderBy(f => f.DepartureTimeUtc)
             .Take(count)
             .AsNoTracking()
@@ -110,7 +131,6 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .OrderByDescending(f => f.DepartureTimeUtc)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
