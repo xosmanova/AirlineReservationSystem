@@ -27,6 +27,8 @@ public partial class AirlineMappingProfile
     public partial SeatDto ToDto(Seat entity);
     public partial IReadOnlyList<SeatDto> ToDtoList(IEnumerable<Seat> entities);
 
+    [MapProperty(nameof(Flight.Aircraft.Model), nameof(FlightDto.AircraftModel))]
+    [MapProperty(nameof(Flight.Aircraft.TotalSeats), nameof(FlightDto.TotalSeats))]
     public partial FlightDto ToDto(Flight entity);
     public partial IReadOnlyList<FlightDto> ToDtoList(IEnumerable<Flight> entities);
 

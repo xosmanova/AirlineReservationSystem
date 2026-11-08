@@ -11,6 +11,11 @@ public interface IFlightRepository : IGenericRepository<Flight>
         int departureAirportId,
         int arrivalAirportId,
         DateTime departureDate,
+        decimal? maxPrice = null,
+        int? airlineId = null,
+        int? maxStops = null,
+        string? sortBy = null,
+        string? sortDirection = null,
         CancellationToken cancellationToken = default);
 
     Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default);

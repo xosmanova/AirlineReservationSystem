@@ -14,4 +14,6 @@ public record SearchFlightsQuery(
     int? PassengersCount = 1,
     decimal? MaxPrice = null,
     int? AirlineId = null,
-    int? MaxStops = null) : IRequest<ApiResponse<IReadOnlyList<FlightDto>>>;
+    int? MaxStops = null,
+    string? SortBy = "departure",
+    string? SortDirection = "asc") : IRequest<ApiResponse<IReadOnlyList<FlightDto>>>;
