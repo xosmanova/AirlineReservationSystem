@@ -8,7 +8,7 @@ namespace AirlineReservation.Infrastructure.Repositories;
 
 /// <summary>
 /// Generic repository implementation using Entity Framework Core.
-/// Enforces soft-delete filtering and asynchronous execution.
+/// Soft-delete is automatically handled by the global EF Core query filter.
 /// </summary>
 /// <typeparam name="T">Entity type deriving from BaseEntity</typeparam>
 public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
@@ -24,13 +24,12 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
 
     public virtual async Task<T?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _dbSet.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, cancellationToken);
+        return await _dbSet.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
     public virtual async Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(x => !x.IsDeleted)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
     }
@@ -38,7 +37,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
     public virtual async Task<IReadOnlyList<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(x => !x.IsDeleted)
             .Where(predicate)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -46,21 +44,17 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
 
     public virtual async Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
-            .Where(x => !x.IsDeleted)
-            .FirstOrDefaultAsync(predicate, cancellationToken);
+        return await _dbSet.FirstOrDefaultAsync(predicate, cancellationToken);
     }
 
     public virtual async Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
     {
-        return await _dbSet
-            .Where(x => !x.IsDeleted)
-            .AnyAsync(predicate, cancellationToken);
+        return await _dbSet.AnyAsync(predicate, cancellationToken);
     }
 
     public virtual async Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.Where(x => !x.IsDeleted);
+        var query = _dbSet.AsQueryable();
         if (predicate != null)
         {
             query = query.Where(predicate);

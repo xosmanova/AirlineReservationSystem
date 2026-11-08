@@ -15,7 +15,8 @@ public class AirlineConfiguration : IEntityTypeConfiguration<Airline>
             .HasMaxLength(5);
 
         builder.HasIndex(a => a.Code)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         builder.Property(a => a.Name)
             .IsRequired()

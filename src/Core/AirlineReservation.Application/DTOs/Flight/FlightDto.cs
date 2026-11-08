@@ -15,8 +15,9 @@ public class FlightDto
     public AirportDto? DepartureAirport { get; set; }
     public int ArrivalAirportId { get; set; }
     public AirportDto? ArrivalAirport { get; set; }
-    public DateTime DepartureTime { get; set; }
-    public DateTime ArrivalTime { get; set; }
+    public DateTime DepartureTimeUtc { get; set; }
+    public DateTime ArrivalTimeUtc { get; set; }
+    public int Stops { get; set; }
     public decimal BasePrice { get; set; }
     public FlightStatus Status { get; set; }
     public TimeSpan Duration { get; set; }

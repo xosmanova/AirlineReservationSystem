@@ -33,22 +33,23 @@ var app = builder.Build();
 // Global Exception Handling Middleware
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
-// Auto-create database & Seed data on startup
-using (var scope = app.Services.CreateScope())
+// Apply migrations and seed data on startup (in Development)
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     try
     {
-        Console.WriteLine("Ensuring database is created...");
-        await dbContext.Database.EnsureCreatedAsync();
+        Console.WriteLine("Applying EF Core migrations...");
+        await dbContext.Database.MigrateAsync();
 
         Console.WriteLine("Seeding initial aviation data...");
-        await AppDbContextSeed.SeedAsync(dbContext);
-        Console.WriteLine("Database seeded successfully!");
+        await AppDbContextSeed.SeedAsync(dbContext, app.Configuration, app.Logger);
+        Console.WriteLine("Database migrated and seeded successfully!");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Database seeding error: {ex.Message}");
+        Console.WriteLine($"Database migration/seeding error: {ex.Message}");
     }
 }
 

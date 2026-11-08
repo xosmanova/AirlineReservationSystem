@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using AirlineReservation.Domain.Common;
 using AirlineReservation.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,20 @@ public class AppDbContext : DbContext
 
         // Apply all entity configurations from current assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+        // Global query filter for soft delete across every BaseEntity-derived type
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+                var property = Expression.Property(parameter, nameof(BaseEntity.IsDeleted));
+                var notDeleted = Expression.Not(property);
+                var lambda = Expression.Lambda(notDeleted, parameter);
+
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

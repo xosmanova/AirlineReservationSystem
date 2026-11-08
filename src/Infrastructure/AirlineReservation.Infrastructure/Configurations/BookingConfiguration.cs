@@ -16,7 +16,8 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .HasMaxLength(6);
 
         builder.HasIndex(b => b.PnrCode)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         builder.Property(b => b.TotalAmount)
             .HasColumnType("decimal(18,2)");

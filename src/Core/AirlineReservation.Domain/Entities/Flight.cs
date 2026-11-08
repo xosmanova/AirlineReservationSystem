@@ -19,14 +19,17 @@ public class Flight : BaseEntity
     public int ArrivalAirportId { get; set; }
     public Airport ArrivalAirport { get; set; } = null!;
 
-    public DateTime DepartureTime { get; set; }
-    public DateTime ArrivalTime { get; set; }
+    public DateTime DepartureTimeUtc { get; set; }
+    public DateTime ArrivalTimeUtc { get; set; }
+
+    // Number of stops (0 = Direct, 1 = 1 stop transit)
+    public int Stops { get; set; } = 0;
 
     public decimal BasePrice { get; set; }
     public FlightStatus Status { get; set; } = FlightStatus.Scheduled;
 
     // Computed / Helper property
-    public TimeSpan Duration => ArrivalTime - DepartureTime;
+    public TimeSpan Duration => ArrivalTimeUtc - DepartureTimeUtc;
 
     // Navigation properties
     public ICollection<Ticket> Tickets { get; set; } = [];
