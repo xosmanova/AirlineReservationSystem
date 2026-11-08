@@ -1,4 +1,4 @@
-using AirlineReservation.Application.Common.Models;
+﻿using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.DTOs.Seat;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightById;
@@ -19,7 +19,7 @@ public class FlightsController : BaseApiController
     /// <param name="query">Search criteria including routes, dates, passengers, price, and stops.</param>
     /// <returns>Standardized ApiResponse containing matching flights with available seat counts.</returns>
     [HttpGet("search")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<FlightDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<FlightDto>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Search([FromQuery] SearchFlightsQuery query)
     {

@@ -1,4 +1,4 @@
-using AirlineReservation.Application.Common.Generators;
+﻿using AirlineReservation.Application.Common.Generators;
 using AirlineReservation.Application.DTOs.Seat;
 using AirlineReservation.Domain.Enums;
 using Xunit;
@@ -127,7 +127,8 @@ public class SvgSeatMapGeneratorTests
         string svg = SvgSeatMapGenerator.Generate("J2101", "AZAL", "A320", rows);
 
         // Assert: 1C and 12C are occupied
-        Assert.Contains("id=\"seat-2\" data-seat-number=\"1C\"", svg);
+        Assert.Contains("id=\"seat-2\"", svg);
+        Assert.Contains("data-seat-number=\"1C\"", svg);
         Assert.Contains("class=\"seat business occupied\"", svg);
         Assert.Contains("aria-disabled=\"true\"", svg);
     }

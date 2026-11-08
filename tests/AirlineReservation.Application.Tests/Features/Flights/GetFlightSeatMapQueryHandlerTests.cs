@@ -1,3 +1,4 @@
+﻿using AirlineReservation.Application.DTOs.Flight;
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Contracts.Persistence;
@@ -129,8 +130,8 @@ public class GetFlightSeatMapQueryHandlerTests
         public Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default)
             => Task.FromResult(_flight?.Id == flightId ? _flight : null);
 
-        public Task<IReadOnlyList<Flight>> SearchFlightsAsync(int d, int a, DateTime st, DateTime en, DateTime now, decimal? minP = null, decimal? maxP = null, int? al = null, int? stp = null, string? sb = null, string? sd = null, int p = 1, int ps = 10, CancellationToken ct = default)
-            => Task.FromResult<IReadOnlyList<Flight>>([]);
+        public Task<(IReadOnlyList<FlightDto> Items, int TotalCount)> SearchFlightsAsync(int d, int a, DateTime st, DateTime en, DateTime now, int pc = 1, decimal? minP = null, decimal? maxP = null, int? al = null, int? stp = null, string? sb = null, string? sd = null, int p = 1, int ps = 10, CancellationToken ct = default)
+            => Task.FromResult<(IReadOnlyList<FlightDto> Items, int TotalCount)>(([], 0));
 
         public Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<Flight>>([]);
