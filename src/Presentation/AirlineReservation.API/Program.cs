@@ -1,4 +1,4 @@
-using AirlineReservation.API.Middlewares;
+﻿using AirlineReservation.API.Middlewares;
 using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Extensions;
 using AirlineReservation.Infrastructure.Context;
@@ -9,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Fail-fast validation of configured business time zone
 var configuredTimeZone = builder.Configuration["Business:TimeZone"] ?? "Asia/Baku";
-TimeZoneHelper.ResolveTimeZone(configuredTimeZone);
+TimeZoneHelper.GetRequiredTimeZone(configuredTimeZone);
 
 // Add services to the container.
 builder.Services.AddControllers();
