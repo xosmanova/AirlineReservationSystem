@@ -192,12 +192,14 @@ public class SearchFlightsQueryHandlerTests
             Bookings = null!;
             Seats = null!;
             Airports = null!;
+            Airlines = null!;
         }
 
         public IFlightRepository Flights { get; }
         public IBookingRepository Bookings { get; }
         public ISeatRepository Seats { get; }
         public IAirportRepository Airports { get; }
+        public IAirlineRepository Airlines { get; }
 
         public IGenericRepository<T> Repository<T>() where T : BaseEntity => throw new NotImplementedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
