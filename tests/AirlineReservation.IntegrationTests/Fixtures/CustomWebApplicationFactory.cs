@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AirlineReservation.Domain.Entities;
@@ -71,8 +71,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // 1. Airports
-        var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku" };
-        var ist = new Airport { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "Europe/Istanbul" };
+        var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku", Aliases = "Baku,Bakı,Baki,Баку" };
+        var ist = new Airport { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "Europe/Istanbul", Aliases = "Istanbul,İstanbul,Istanbul Airport,Стамбул" };
         context.Airports.AddRange(gyd, ist);
 
         // 2. Airline
