@@ -1,3 +1,5 @@
+using AirlineReservation.Application.DTOs.Seat;
+using System.Linq;
 using System;
 using System.Net;
 using System.Net.Http.Json;
@@ -146,5 +148,31 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         Assert.NotNull(result?.Data);
 
         Assert.DoesNotContain(result.Data.Items, f => f.Id == cancelledFlightId);
+    }
+
+    [Fact]
+    public async Task SearchAvailableSeatsCount_Matches_SeatMapAvailableSeatsCount_Exactly()
+    {
+        int depId = _factory.TestDepartureAirportId;
+        int arrId = _factory.TestArrivalAirportId;
+        int flight1Id = _factory.TestFlight1Id;
+
+        // 1. Search endpoint
+        var searchResp = await _client.GetAsync(
+            $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
+        Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
+        var searchResult = await searchResp.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var flightInSearch = Assert.Single(searchResult!.Data!.Items, f => f.Id == flight1Id);
+
+        // 2. SeatMap endpoint
+        var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
+        var seatMapResult = await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>();
+        Assert.NotNull(seatMapResult?.Data);
+
+        // 3. Exact equality between search and seat map
+        Assert.Equal(flightInSearch.AvailableSeatsCount, seatMapResult.Data.AvailableSeatsCount);
+        int countedFreeSeatsInRows = seatMapResult.Data.Rows.SelectMany(r => r.Seats).Count(s => !s.IsOccupied);
+        Assert.Equal(flightInSearch.AvailableSeatsCount, countedFreeSeatsInRows);
     }
 }

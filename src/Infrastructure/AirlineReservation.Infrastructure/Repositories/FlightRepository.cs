@@ -1,3 +1,4 @@
+using AirlineReservation.Domain.Specifications;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Airline;
 using AirlineReservation.Application.DTOs.Airport;
@@ -77,7 +78,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
         if (passengersCount > 0)
         {
             baseQuery = baseQuery.Where(f =>
-                (f.Aircraft.TotalSeats - f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled)) >= passengersCount);
+                (f.Aircraft.TotalSeats - f.Tickets.AsQueryable().Count(TicketSpecifications.IsActive)) >= passengersCount);
         }
 
         // 1. TotalCount query executing in SQL with the EXACT SAME filters
@@ -124,7 +125,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
                 AircraftModel = f.Aircraft != null ? f.Aircraft.Model : string.Empty,
                 TotalSeats = f.Aircraft != null ? f.Aircraft.TotalSeats : 0,
                 AvailableSeatsCount = (f.Aircraft != null ? f.Aircraft.TotalSeats : 0) -
-                    f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled),
+                    f.Tickets.AsQueryable().Count(TicketSpecifications.IsActive),
                 DepartureAirportId = f.DepartureAirportId,
                 DepartureAirport = f.DepartureAirport != null ? new AirportDto
                 {
