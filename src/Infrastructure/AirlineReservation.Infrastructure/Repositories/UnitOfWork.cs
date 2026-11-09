@@ -17,6 +17,7 @@ public class UnitOfWork : IUnitOfWork
     private IFlightRepository? _flights;
     private IBookingRepository? _bookings;
     private ISeatRepository? _seats;
+    private IAirportRepository? _airports;
     private IDbContextTransaction? _transaction;
     private bool _disposed;
 
@@ -28,6 +29,7 @@ public class UnitOfWork : IUnitOfWork
     public IFlightRepository Flights => _flights ??= new FlightRepository(_context);
     public IBookingRepository Bookings => _bookings ??= new BookingRepository(_context);
     public ISeatRepository Seats => _seats ??= new SeatRepository(_context);
+    public IAirportRepository Airports => _airports ??= new AirportRepository(_context);
 
     public IGenericRepository<T> Repository<T>() where T : BaseEntity
     {
