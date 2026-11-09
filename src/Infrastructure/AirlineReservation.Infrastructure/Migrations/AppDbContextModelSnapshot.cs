@@ -114,6 +114,10 @@ namespace AirlineReservation.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Aliases")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)

@@ -11,6 +11,8 @@ public interface IUnitOfWork : IDisposable, IAsyncDisposable
     IFlightRepository Flights { get; }
     IBookingRepository Bookings { get; }
     ISeatRepository Seats { get; }
+    IAirportRepository Airports { get; }
+    IAirlineRepository Airlines { get; }
 
     IGenericRepository<T> Repository<T>() where T : BaseEntity;
 

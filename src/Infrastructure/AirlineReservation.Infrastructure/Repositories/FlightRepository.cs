@@ -1,3 +1,4 @@
+using AirlineReservation.Domain.Specifications;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Airline;
 using AirlineReservation.Application.DTOs.Airport;
@@ -77,7 +78,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
         if (passengersCount > 0)
         {
             baseQuery = baseQuery.Where(f =>
-                (f.Aircraft.TotalSeats - f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled)) >= passengersCount);
+                (f.Aircraft.TotalSeats - f.Tickets.AsQueryable().Count(TicketSpecifications.IsActive)) >= passengersCount);
         }
 
         // 1. TotalCount query executing in SQL with the EXACT SAME filters
@@ -88,11 +89,15 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
 
         IOrderedQueryable<Flight> sortedQuery = sortBy?.ToLowerInvariant() switch
         {
-            "price" => isDescending ? baseQuery.OrderByDescending(f => f.BasePrice) : baseQuery.OrderBy(f => f.BasePrice),
+            "price" => isDescending
+                ? baseQuery.OrderByDescending(f => f.BasePrice).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => f.BasePrice).ThenBy(f => f.Id),
             "duration" => isDescending
-                ? baseQuery.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc))
-                : baseQuery.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)),
-            _ => isDescending ? baseQuery.OrderByDescending(f => f.DepartureTimeUtc) : baseQuery.OrderBy(f => f.DepartureTimeUtc)
+                ? baseQuery.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)).ThenBy(f => f.Id),
+            _ => isDescending
+                ? baseQuery.OrderByDescending(f => f.DepartureTimeUtc).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => f.DepartureTimeUtc).ThenBy(f => f.Id)
         };
 
         // Pagination
@@ -120,7 +125,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
                 AircraftModel = f.Aircraft != null ? f.Aircraft.Model : string.Empty,
                 TotalSeats = f.Aircraft != null ? f.Aircraft.TotalSeats : 0,
                 AvailableSeatsCount = (f.Aircraft != null ? f.Aircraft.TotalSeats : 0) -
-                    f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled),
+                    f.Tickets.AsQueryable().Count(TicketSpecifications.IsActive),
                 DepartureAirportId = f.DepartureAirportId,
                 DepartureAirport = f.DepartureAirport != null ? new AirportDto
                 {

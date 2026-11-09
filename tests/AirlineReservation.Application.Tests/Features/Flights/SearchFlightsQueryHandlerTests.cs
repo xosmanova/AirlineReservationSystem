@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Common.Interfaces;
@@ -191,11 +191,15 @@ public class SearchFlightsQueryHandlerTests
             Flights = flightRepo;
             Bookings = null!;
             Seats = null!;
+            Airports = null!;
+            Airlines = null!;
         }
 
         public IFlightRepository Flights { get; }
         public IBookingRepository Bookings { get; }
         public ISeatRepository Seats { get; }
+        public IAirportRepository Airports { get; }
+        public IAirlineRepository Airlines { get; }
 
         public IGenericRepository<T> Repository<T>() where T : BaseEntity => throw new NotImplementedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);

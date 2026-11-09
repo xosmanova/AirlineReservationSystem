@@ -56,17 +56,42 @@ public static class AppDbContextSeed
         {
             var airports = new List<Airport>
             {
-                new() { IataCode = "GYD", Name = "Heydar Aliyev International Airport", City = "Baku", Country = "Azerbaijan", TimeZone = "UTC+4" },
-                new() { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3" },
-                new() { IataCode = "SAW", Name = "Sabiha Gokcen International Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3" },
-                new() { IataCode = "DXB", Name = "Dubai International Airport", City = "Dubai", Country = "United Arab Emirates", TimeZone = "UTC+4" },
-                new() { IataCode = "JFK", Name = "John F. Kennedy International Airport", City = "New York", Country = "United States", TimeZone = "UTC-5" },
-                new() { IataCode = "LHR", Name = "Heathrow Airport", City = "London", Country = "United Kingdom", TimeZone = "UTC+0" },
-                new() { IataCode = "FRA", Name = "Frankfurt Airport", City = "Frankfurt", Country = "Germany", TimeZone = "UTC+1" }
+                new() { IataCode = "GYD", Name = "Heydar Aliyev International Airport", City = "Baku", Country = "Azerbaijan", TimeZone = "UTC+4", Aliases = "Baku,Bakı,Baki,Баку" },
+                new() { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3", Aliases = "Istanbul,İstanbul,Istanbul Airport,Стамбул" },
+                new() { IataCode = "SAW", Name = "Sabiha Gokcen International Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3", Aliases = "Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул" },
+                new() { IataCode = "DXB", Name = "Dubai International Airport", City = "Dubai", Country = "United Arab Emirates", TimeZone = "UTC+4", Aliases = "Dubai,Dubay,Дубай" },
+                new() { IataCode = "JFK", Name = "John F. Kennedy International Airport", City = "New York", Country = "United States", TimeZone = "UTC-5", Aliases = "New York,Nyu-York,Нью-Йорк" },
+                new() { IataCode = "LHR", Name = "Heathrow Airport", City = "London", Country = "United Kingdom", TimeZone = "UTC+0", Aliases = "London,Londan,Лондон" },
+                new() { IataCode = "FRA", Name = "Frankfurt Airport", City = "Frankfurt", Country = "Germany", TimeZone = "UTC+1", Aliases = "Frankfurt,Франкфурт" }
             };
 
             await context.Airports.AddRangeAsync(airports);
             await context.SaveChangesAsync();
+        }
+        else
+        {
+            var airportsWithoutAliases = await context.Airports.Where(a => string.IsNullOrEmpty(a.Aliases)).ToListAsync();
+            if (airportsWithoutAliases.Count > 0)
+            {
+                var aliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["GYD"] = "Baku,Bakı,Baki,Баку",
+                    ["IST"] = "Istanbul,İstanbul,Istanbul Airport,Стамбул",
+                    ["SAW"] = "Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул",
+                    ["DXB"] = "Dubai,Dubay,Дубай",
+                    ["JFK"] = "New York,Nyu-York,Нью-Йорк",
+                    ["LHR"] = "London,Londan,Лондон",
+                    ["FRA"] = "Frankfurt,Франкфурт"
+                };
+                foreach (var a in airportsWithoutAliases)
+                {
+                    if (aliasMap.TryGetValue(a.IataCode, out var val))
+                    {
+                        a.Aliases = val;
+                    }
+                }
+                await context.SaveChangesAsync();
+            }
         }
 
         // 2. Seed Airlines (All 4 airlines)

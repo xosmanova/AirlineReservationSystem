@@ -1,4 +1,4 @@
-﻿using AirlineReservation.Application.DTOs.Flight;
+using AirlineReservation.Application.DTOs.Flight;
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Contracts.Persistence;
@@ -103,6 +103,8 @@ public class GetFlightSeatMapQueryHandlerTests
         public IFlightRepository Flights { get; }
         public IBookingRepository Bookings => throw new NotImplementedException();
         public ISeatRepository Seats => throw new NotImplementedException();
+        public IAirportRepository Airports => throw new NotImplementedException();
+        public IAirlineRepository Airlines => throw new NotImplementedException();
 
         public FakeUnitOfWork(IFlightRepository flightRepository)
         {

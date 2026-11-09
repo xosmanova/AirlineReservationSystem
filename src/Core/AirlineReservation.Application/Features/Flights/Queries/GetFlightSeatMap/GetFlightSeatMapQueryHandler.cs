@@ -1,3 +1,4 @@
+using AirlineReservation.Domain.Specifications;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Generators;
 using AirlineReservation.Application.Common.Models;
@@ -34,14 +35,9 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             throw new NotFoundException($"Aircraft or seat layout for flight {request.FlightId} was not found.");
         }
 
-        // Active occupied seats: ticket is active and booking is not cancelled/expired
+        // Active occupied seats: ticket is active according to unified domain specification
         var occupiedSeatIds = flight.Tickets
-            .Where(t => !t.IsDeleted &&
-                        !t.IsCancelled &&
-                        t.Booking != null &&
-                        !t.Booking.IsDeleted &&
-                        t.Booking.Status != BookingStatus.Cancelled &&
-                        t.Booking.Status != BookingStatus.Expired)
+            .Where(TicketSpecifications.IsActiveCompiled)
             .Select(t => t.SeatId)
             .ToHashSet();
 

@@ -71,13 +71,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // 1. Airports
-        var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku" };
-        var ist = new Airport { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "Europe/Istanbul" };
-        context.Airports.AddRange(gyd, ist);
+        var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku", Aliases = "Baku,Bakı,Baki,Баку" };
+        var ist = new Airport { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "Europe/Istanbul", Aliases = "Istanbul,İstanbul,Istanbul Airport,Стамбул" };
+        var saw = new Airport { IataCode = "SAW", Name = "Sabiha Gokcen International Airport", City = "Istanbul", Country = "Turkey", TimeZone = "Europe/Istanbul", Aliases = "Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул" };
+        context.Airports.AddRange(gyd, ist, saw);
 
         // 2. Airline
         var azal = new Airline { Code = "J2", Name = "Azerbaijan Airlines", LogoUrl = "https://azal.az/logo.png" };
-        context.Airlines.Add(azal);
+        var thy = new Airline { Code = "TK", Name = "Turkish Airlines", LogoUrl = "https://turkishairlines.com/logo.png" };
+        context.Airlines.AddRange(azal, thy);
 
         // 3. Aircrafts
         var a320 = new Aircraft { Model = "Airbus A320", TailNumber = "TEST-A320-1", TotalSeats = 2, Airline = azal };
