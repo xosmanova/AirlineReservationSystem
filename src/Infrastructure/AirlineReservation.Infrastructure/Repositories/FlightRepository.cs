@@ -88,11 +88,15 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
 
         IOrderedQueryable<Flight> sortedQuery = sortBy?.ToLowerInvariant() switch
         {
-            "price" => isDescending ? baseQuery.OrderByDescending(f => f.BasePrice) : baseQuery.OrderBy(f => f.BasePrice),
+            "price" => isDescending
+                ? baseQuery.OrderByDescending(f => f.BasePrice).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => f.BasePrice).ThenBy(f => f.Id),
             "duration" => isDescending
-                ? baseQuery.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc))
-                : baseQuery.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)),
-            _ => isDescending ? baseQuery.OrderByDescending(f => f.DepartureTimeUtc) : baseQuery.OrderBy(f => f.DepartureTimeUtc)
+                ? baseQuery.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)).ThenBy(f => f.Id),
+            _ => isDescending
+                ? baseQuery.OrderByDescending(f => f.DepartureTimeUtc).ThenBy(f => f.Id)
+                : baseQuery.OrderBy(f => f.DepartureTimeUtc).ThenBy(f => f.Id)
         };
 
         // Pagination
