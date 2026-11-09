@@ -4,12 +4,13 @@ using AirlineReservation.Application.Extensions;
 using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Fail-fast validation of configured business time zone
 var configuredTimeZone = builder.Configuration["Business:TimeZone"] ?? "Asia/Baku";
-TimeZoneHelper.ResolveTimeZone(configuredTimeZone);
+TimeZoneHelper.GetRequiredTimeZone(configuredTimeZone);
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -62,6 +63,11 @@ if (app.Environment.IsDevelopment())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("Airline Reservation API")
+               .WithTheme(ScalarTheme.Moon);
+    });
 }
 
 app.UseCors("AllowClient");
@@ -71,3 +77,5 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

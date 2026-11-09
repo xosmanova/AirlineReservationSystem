@@ -1,4 +1,7 @@
 using AirlineReservation.Application.Contracts.Persistence;
+using AirlineReservation.Application.DTOs.Airline;
+using AirlineReservation.Application.DTOs.Airport;
+using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
 using AirlineReservation.Infrastructure.Context;
@@ -9,20 +12,23 @@ namespace AirlineReservation.Infrastructure.Repositories;
 /// <summary>
 /// Specialized repository implementation for Flight operations.
 /// Utilizes composite index IX_Flights_DepartureAirportId_ArrivalAirportId_DepartureTimeUtc.
-/// Eager-loads all navigation properties to prevent N+1 query issues.
+/// Uses optimized correlated subquery and projection to avoid memory overhead and N+1 queries.
 /// </summary>
 public class FlightRepository : GenericRepository<Flight>, IFlightRepository
 {
+    private static readonly FlightStatus[] SellableStatuses = [FlightStatus.Scheduled, FlightStatus.Delayed];
+
     public FlightRepository(AppDbContext context) : base(context)
     {
     }
 
-    public async Task<IReadOnlyList<Flight>> SearchFlightsAsync(
+    public async Task<(IReadOnlyList<FlightDto> Items, int TotalCount)> SearchFlightsAsync(
         int departureAirportId,
         int arrivalAirportId,
         DateTime startUtc,
         DateTime endUtc,
         DateTime nowUtc,
+        int passengersCount = 1,
         decimal? minPrice = null,
         decimal? maxPrice = null,
         int? airlineId = null,
@@ -33,65 +39,118 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
         int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        // Composite index sargable query with exact UTC range bounds
-        // Excludes departed flights and cancelled flights
-        var query = _dbSet
-            .Include(f => f.Airline)
-            .Include(f => f.Aircraft)
-            .Include(f => f.DepartureAirport)
-            .Include(f => f.ArrivalAirport)
-            .Include(f => f.Tickets)
-                .ThenInclude(t => t.Booking)
+        // Base query with sargable filters, sellable statuses (Scheduled + Delayed), and future departure
+        var baseQuery = _dbSet
             .Where(f => f.DepartureAirportId == departureAirportId
                         && f.ArrivalAirportId == arrivalAirportId
                         && f.DepartureTimeUtc >= startUtc
                         && f.DepartureTimeUtc < endUtc
                         && f.DepartureTimeUtc > nowUtc
-                        && f.Status == FlightStatus.Scheduled);
+                        && SellableStatuses.Contains(f.Status));
 
         // Optional filter: Min price
         if (minPrice.HasValue && minPrice.Value >= 0)
         {
-            query = query.Where(f => f.BasePrice >= minPrice.Value);
+            baseQuery = baseQuery.Where(f => f.BasePrice >= minPrice.Value);
         }
 
         // Optional filter: Max price
         if (maxPrice.HasValue && maxPrice.Value > 0)
         {
-            query = query.Where(f => f.BasePrice <= maxPrice.Value);
+            baseQuery = baseQuery.Where(f => f.BasePrice <= maxPrice.Value);
         }
 
         // Optional filter: Airline ID
         if (airlineId.HasValue && airlineId.Value > 0)
         {
-            query = query.Where(f => f.AirlineId == airlineId.Value);
+            baseQuery = baseQuery.Where(f => f.AirlineId == airlineId.Value);
         }
 
         // Optional filter: Max stops (0 = direct only, 1 = up to 1 stop)
         if (maxStops.HasValue && maxStops.Value >= 0)
         {
-            query = query.Where(f => f.Stops <= maxStops.Value);
+            baseQuery = baseQuery.Where(f => f.Stops <= maxStops.Value);
         }
+
+        // Correlated subquery in SQL: AvailableSeats = TotalSeats - active tickets (not deleted, not cancelled, booking not cancelled)
+        // Applied BEFORE OFFSET/FETCH in SQL
+        if (passengersCount > 0)
+        {
+            baseQuery = baseQuery.Where(f =>
+                (f.Aircraft.TotalSeats - f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled)) >= passengersCount);
+        }
+
+        // 1. TotalCount query executing in SQL with the EXACT SAME filters
+        int totalCount = await baseQuery.CountAsync(cancellationToken);
 
         // Sorting (departure, price, duration)
         bool isDescending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
 
-        query = sortBy?.ToLowerInvariant() switch
+        IOrderedQueryable<Flight> sortedQuery = sortBy?.ToLowerInvariant() switch
         {
-            "price" => isDescending ? query.OrderByDescending(f => f.BasePrice) : query.OrderBy(f => f.BasePrice),
+            "price" => isDescending ? baseQuery.OrderByDescending(f => f.BasePrice) : baseQuery.OrderBy(f => f.BasePrice),
             "duration" => isDescending
-                ? query.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc))
-                : query.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)),
-            _ => isDescending ? query.OrderByDescending(f => f.DepartureTimeUtc) : query.OrderBy(f => f.DepartureTimeUtc)
+                ? baseQuery.OrderByDescending(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc))
+                : baseQuery.OrderBy(f => EF.Functions.DateDiffMinute(f.DepartureTimeUtc, f.ArrivalTimeUtc)),
+            _ => isDescending ? baseQuery.OrderByDescending(f => f.DepartureTimeUtc) : baseQuery.OrderBy(f => f.DepartureTimeUtc)
         };
 
         // Pagination
+        IQueryable<Flight> pagedQuery = sortedQuery;
         if (page > 0 && pageSize > 0)
         {
-            query = query.Skip((page - 1) * pageSize).Take(pageSize);
+            pagedQuery = sortedQuery.Skip((page - 1) * pageSize).Take(pageSize);
         }
 
-        return await query.AsNoTracking().ToListAsync(cancellationToken);
+        // 2. Projected data query with AsNoTracking (no Ticket entity tracking, zero N+1)
+        var items = await pagedQuery
+            .Select(f => new FlightDto
+            {
+                Id = f.Id,
+                FlightNumber = f.FlightNumber,
+                AirlineId = f.AirlineId,
+                Airline = f.Airline != null ? new AirlineDto
+                {
+                    Id = f.Airline.Id,
+                    Code = f.Airline.Code,
+                    Name = f.Airline.Name,
+                    LogoUrl = f.Airline.LogoUrl
+                } : null,
+                AircraftId = f.AircraftId,
+                AircraftModel = f.Aircraft != null ? f.Aircraft.Model : string.Empty,
+                TotalSeats = f.Aircraft != null ? f.Aircraft.TotalSeats : 0,
+                AvailableSeatsCount = (f.Aircraft != null ? f.Aircraft.TotalSeats : 0) -
+                    f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking.Status != BookingStatus.Cancelled),
+                DepartureAirportId = f.DepartureAirportId,
+                DepartureAirport = f.DepartureAirport != null ? new AirportDto
+                {
+                    Id = f.DepartureAirport.Id,
+                    IataCode = f.DepartureAirport.IataCode,
+                    Name = f.DepartureAirport.Name,
+                    City = f.DepartureAirport.City,
+                    Country = f.DepartureAirport.Country,
+                    Timezone = f.DepartureAirport.TimeZone
+                } : null,
+                ArrivalAirportId = f.ArrivalAirportId,
+                ArrivalAirport = f.ArrivalAirport != null ? new AirportDto
+                {
+                    Id = f.ArrivalAirport.Id,
+                    IataCode = f.ArrivalAirport.IataCode,
+                    Name = f.ArrivalAirport.Name,
+                    City = f.ArrivalAirport.City,
+                    Country = f.ArrivalAirport.Country,
+                    Timezone = f.ArrivalAirport.TimeZone
+                } : null,
+                DepartureTimeUtc = f.DepartureTimeUtc,
+                ArrivalTimeUtc = f.ArrivalTimeUtc,
+                Stops = f.Stops,
+                BasePrice = f.BasePrice,
+                Status = f.Status
+            })
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
     }
 
     public async Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default)
@@ -117,7 +176,7 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .Include(f => f.Aircraft)
             .Include(f => f.DepartureAirport)
             .Include(f => f.ArrivalAirport)
-            .Where(f => f.DepartureTimeUtc >= now && f.Status == FlightStatus.Scheduled)
+            .Where(f => f.DepartureTimeUtc >= now && SellableStatuses.Contains(f.Status))
             .OrderBy(f => f.DepartureTimeUtc)
             .Take(count)
             .AsNoTracking()

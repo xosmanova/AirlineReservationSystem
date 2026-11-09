@@ -15,5 +15,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AirlineReservation.Application.Tests/AirlineReservation.Application.Tests.csproj" />
+    <Project Path="tests/AirlineReservation.IntegrationTests/AirlineReservation.IntegrationTests.csproj" />
   </Folder>
 </Solution>

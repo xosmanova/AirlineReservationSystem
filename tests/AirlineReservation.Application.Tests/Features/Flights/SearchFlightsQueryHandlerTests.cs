@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Common.Interfaces;
@@ -69,7 +69,7 @@ public class SearchFlightsQueryHandlerTests
         var (flight, _) = CreateSampleFlight(totalSeats: 142);
         var fakeRepo = new FakeFlightRepository([flight]);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _businessTime, TimeProvider.System);
 
         var query = new SearchFlightsQuery(
             DepartureAirportId: 1,
@@ -84,9 +84,10 @@ public class SearchFlightsQueryHandlerTests
         // Assert
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
-        Assert.Single(result.Data);
+        Assert.Equal(1, result.Data.TotalCount);
+        Assert.Single(result.Data.Items);
 
-        var flightDto = result.Data[0];
+        var flightDto = result.Data.Items[0];
         Assert.Equal("J2101", flightDto.FlightNumber);
         Assert.Equal(142, flightDto.TotalSeats);
         Assert.Equal(140, flightDto.AvailableSeatsCount);
@@ -101,7 +102,7 @@ public class SearchFlightsQueryHandlerTests
         var (flight, _) = CreateSampleFlight(totalSeats: 142);
         var fakeRepo = new FakeFlightRepository([flight]);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _businessTime, TimeProvider.System);
 
         var query = new SearchFlightsQuery(
             DepartureAirportId: 1,
@@ -116,7 +117,8 @@ public class SearchFlightsQueryHandlerTests
         // Assert
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
-        Assert.Empty(result.Data);
+        Assert.Equal(0, result.Data.TotalCount);
+        Assert.Empty(result.Data.Items);
     }
 
     [Fact]
@@ -130,7 +132,7 @@ public class SearchFlightsQueryHandlerTests
 
         var fakeRepo = new FakeFlightRepository([flight]);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new SearchFlightsQueryHandler(fakeUow, _mapper, _businessTime, TimeProvider.System);
+        var handler = new SearchFlightsQueryHandler(fakeUow, _businessTime, TimeProvider.System);
 
         var query = new SearchFlightsQuery(
             DepartureAirportId: 1,
@@ -142,8 +144,9 @@ public class SearchFlightsQueryHandlerTests
 
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
-        Assert.Single(result.Data);
-        Assert.Equal(99, result.Data[0].Id);
+        Assert.Equal(1, result.Data.TotalCount);
+        Assert.Single(result.Data.Items);
+        Assert.Equal(99, result.Data.Items[0].Id);
     }
 
     [Fact]
@@ -179,18 +182,20 @@ public class SearchFlightsQueryHandlerTests
             handler.Handle(new GetFlightByIdQuery(999), CancellationToken.None));
     }
 
-    #region Fakes for Unit Testing
+    // --- Fakes for in-memory testing without DB dependency ---
 
     private sealed class FakeUnitOfWork : IUnitOfWork
     {
-        public IFlightRepository Flights { get; }
-        public IBookingRepository Bookings => throw new NotImplementedException();
-        public ISeatRepository Seats => throw new NotImplementedException();
-
-        public FakeUnitOfWork(IFlightRepository flightRepository)
+        public FakeUnitOfWork(IFlightRepository flightRepo)
         {
-            Flights = flightRepository;
+            Flights = flightRepo;
+            Bookings = null!;
+            Seats = null!;
         }
+
+        public IFlightRepository Flights { get; }
+        public IBookingRepository Bookings { get; }
+        public ISeatRepository Seats { get; }
 
         public IGenericRepository<T> Repository<T>() where T : BaseEntity => throw new NotImplementedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);
@@ -210,12 +215,13 @@ public class SearchFlightsQueryHandlerTests
             _flights = flights.ToList();
         }
 
-        public Task<IReadOnlyList<Flight>> SearchFlightsAsync(
+        public Task<(IReadOnlyList<FlightDto> Items, int TotalCount)> SearchFlightsAsync(
             int departureAirportId,
             int arrivalAirportId,
             DateTime startUtc,
             DateTime endUtc,
             DateTime nowUtc,
+            int passengersCount = 1,
             decimal? minPrice = null,
             decimal? maxPrice = null,
             int? airlineId = null,
@@ -245,7 +251,37 @@ public class SearchFlightsQueryHandlerTests
             if (maxStops.HasValue && maxStops.Value >= 0)
                 query = query.Where(f => f.Stops <= maxStops.Value);
 
-            return Task.FromResult<IReadOnlyList<Flight>>(query.ToList());
+            var list = query.ToList();
+            var dtos = new List<FlightDto>();
+            foreach (var f in list)
+            {
+                int activeTickets = f.Tickets.Count(t => !t.IsDeleted && !t.IsCancelled && t.Booking != null && t.Booking.Status != BookingStatus.Cancelled && t.Booking.Status != BookingStatus.Expired);
+                int totalSeats = f.Aircraft?.TotalSeats ?? 0;
+                int availableSeats = totalSeats - activeTickets;
+
+                if (passengersCount > 0 && availableSeats < passengersCount)
+                    continue;
+
+                dtos.Add(new FlightDto
+                {
+                    Id = f.Id,
+                    FlightNumber = f.FlightNumber,
+                    AirlineId = f.AirlineId,
+                    AircraftId = f.AircraftId,
+                    AircraftModel = f.Aircraft?.Model ?? "",
+                    TotalSeats = totalSeats,
+                    AvailableSeatsCount = availableSeats,
+                    DepartureAirportId = f.DepartureAirportId,
+                    ArrivalAirportId = f.ArrivalAirportId,
+                    DepartureTimeUtc = f.DepartureTimeUtc,
+                    ArrivalTimeUtc = f.ArrivalTimeUtc,
+                    Stops = f.Stops,
+                    BasePrice = f.BasePrice,
+                    Status = f.Status
+                });
+            }
+
+            return Task.FromResult<(IReadOnlyList<FlightDto> Items, int TotalCount)>((dtos, dtos.Count));
         }
 
         public Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default)
@@ -286,6 +322,9 @@ public class SearchFlightsQueryHandlerTests
             return Task.FromResult(entity);
         }
 
+                public Task<int> CountAsync(Expression<Func<Flight, bool>>? predicate = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(predicate == null ? _flights.Count : _flights.AsQueryable().Count(predicate));
+
         public Task AddRangeAsync(IEnumerable<Flight> entities, CancellationToken cancellationToken = default)
         {
             _flights.AddRange(entities);
@@ -294,12 +333,8 @@ public class SearchFlightsQueryHandlerTests
 
         public void Update(Flight entity) { }
         public void Delete(Flight entity) => _flights.Remove(entity);
-        public void SoftDelete(Flight entity) { entity.IsDeleted = true; }
-        public Task<bool> ExistsAsync(int id, CancellationToken cancellationToken = default)
-            => Task.FromResult(_flights.Any(f => f.Id == id));
-        public Task<int> CountAsync(Expression<Func<Flight, bool>>? predicate = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(predicate == null ? _flights.Count : _flights.AsQueryable().Count(predicate));
-    }
 
-    #endregion
+        public Task UpdateAsync(Flight entity, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DeleteAsync(Flight entity, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
 }

@@ -6,6 +6,7 @@ namespace AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 
 /// <summary>
 /// CQRS Query for searching available scheduled flights with filtering, sorting, and pagination criteria.
+/// Returns paginated result with items, total count, and navigation metadata.
 /// </summary>
 public record SearchFlightsQuery(
     int DepartureAirportId,
@@ -19,4 +20,4 @@ public record SearchFlightsQuery(
     string? SortBy = "departure",
     string? SortDirection = "asc",
     int Page = 1,
-    int PageSize = 10) : IRequest<ApiResponse<IReadOnlyList<FlightDto>>>;
+    int PageSize = 10) : IRequest<ApiResponse<PagedResult<FlightDto>>>;

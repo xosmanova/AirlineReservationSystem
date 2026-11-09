@@ -10,7 +10,7 @@ namespace AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 /// - Departure date cannot be in the past (timezone-aware relative to Asia/Baku).
 /// - Valid passenger count.
 /// - Valid price boundaries.
-/// - Positive pagination parameters.
+/// - Positive pagination parameters with PageSize max 50.
 /// </summary>
 public class SearchFlightsQueryValidator : AbstractValidator<SearchFlightsQuery>
 {
@@ -61,7 +61,7 @@ public class SearchFlightsQueryValidator : AbstractValidator<SearchFlightsQuery>
             .WithMessage("Page must be at least 1.");
 
         RuleFor(x => x.PageSize)
-            .InclusiveBetween(1, 100)
-            .WithMessage("PageSize must be between 1 and 100.");
+            .InclusiveBetween(1, 50)
+            .WithMessage("PageSize must be between 1 and 50.");
     }
 }

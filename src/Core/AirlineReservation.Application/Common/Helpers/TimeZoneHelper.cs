@@ -5,13 +5,13 @@ public static class TimeZoneHelper
     /// <summary>
     /// Resolves an IANA or Windows time zone ID safely across operating systems.
     /// E.g. "Asia/Baku" is resolved directly on Linux/macOS or mapped to "Azerbaijan Standard Time" on Windows.
-    /// Fails fast if the time zone cannot be resolved (no silent UTC fallback).
+    /// THROWS InvalidOperationException when the zone cannot be resolved (no silent UTC fallback).
     /// </summary>
-    public static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    public static TimeZoneInfo GetRequiredTimeZone(string timeZoneId)
     {
         if (string.IsNullOrWhiteSpace(timeZoneId))
         {
-            throw new ArgumentException("Time zone ID cannot be null or empty.", nameof(timeZoneId));
+            throw new InvalidOperationException("Business time zone configuration cannot be null or empty.");
         }
 
         try
@@ -29,6 +29,11 @@ public static class TimeZoneHelper
                 $"Business time zone '{timeZoneId}' could not be resolved on this operating system. Please check configuration.");
         }
     }
+
+    /// <summary>
+    /// Backwards-compatible alias for GetRequiredTimeZone.
+    /// </summary>
+    public static TimeZoneInfo ResolveTimeZone(string timeZoneId) => GetRequiredTimeZone(timeZoneId);
 
     /// <summary>
     /// Computes today's date in the specified time zone using TimeProvider.
