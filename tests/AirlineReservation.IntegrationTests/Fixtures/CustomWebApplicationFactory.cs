@@ -38,6 +38,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Register AppDbContext with isolated test database
             services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(TestConnectionString));
+
+            // Replace TimeProvider with a deterministic clock before test flight departure (08:00Z on 2026-11-10)
+            var timeDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(TimeProvider));
+            if (timeDescriptor != null)
+            {
+                services.Remove(timeDescriptor);
+            }
+            services.AddSingleton<TimeProvider>(
+                new FixedTimeProvider(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero)));
         });
     }
 
@@ -201,5 +210,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         TestFlight3CancelledId = f3.Id;
         TestDepartureAirportId = gyd.Id;
         TestArrivalAirportId = ist.Id;
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset fixedUtcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => fixedUtcNow;
     }
 }
