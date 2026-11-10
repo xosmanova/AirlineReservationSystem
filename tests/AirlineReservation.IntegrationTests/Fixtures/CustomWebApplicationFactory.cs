@@ -59,7 +59,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:Issuer"] = "AirlineReservation.API",
                 ["Jwt:Audience"] = "AirlineReservation.Client",
                 ["Jwt:ExpiryMinutes"] = "60",
-                ["Jwt:Key"] = TestJwtKey
+                ["Jwt:Key"] = TestJwtKey,
+                ["RateLimiting:Login:PermitLimit"] = "100",
+                ["RateLimiting:Login:WindowSeconds"] = "60"
             });
         });
 

@@ -33,6 +33,7 @@ builder.Services.AddApplicationServices();
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddJwtAuthentication();
+builder.Services.AddLoginRateLimiting(builder.Configuration);
 
 builder.Services.AddSwaggerAndScalarOpenApi();
 
@@ -77,6 +78,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowClient");
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

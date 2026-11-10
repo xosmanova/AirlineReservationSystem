@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using AirlineReservation.API.Extensions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Auth;
@@ -8,6 +9,7 @@ using AirlineReservation.Application.Features.Auth.Commands.Register;
 using AirlineReservation.Application.Features.Auth.Queries.GetCurrentUser;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AirlineReservation.API.Controllers;
 
@@ -38,9 +40,11 @@ public class AuthController : BaseApiController
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
     [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
