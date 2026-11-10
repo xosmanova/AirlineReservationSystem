@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AirlineReservation.Domain.Entities;
@@ -9,7 +11,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AirlineReservation.IntegrationTests.Fixtures;
 
@@ -17,6 +22,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string TestConnectionString =
         "Server=.\\SQLEXPRESS;Database=AirlineReservationDb_Test;Trusted_Connection=True;TrustServerCertificate=True;";
+
+    public const string TestAdminEmail = "admin@airline.test";
+    public string TestAdminCredential { get; } = $"AirlineTest!{Guid.NewGuid():N}aA1";
 
     public int TestFlight1Id { get; private set; }
     public int TestFlight2DelayedId { get; private set; }
@@ -27,6 +35,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        builder.ConfigureAppConfiguration((_, configBuilder) =>
+        {
+            // Explicitly clear any user-secrets (secrets.json) source so tests never depend on machine secrets
+            for (int i = configBuilder.Sources.Count - 1; i >= 0; i--)
+            {
+                if (configBuilder.Sources[i] is JsonConfigurationSource jsonSource &&
+                    string.Equals(Path.GetFileName(jsonSource.Path), "secrets.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    configBuilder.Sources.RemoveAt(i);
+                }
+            }
+
+            // Supply deterministic in-memory configuration overrides
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                ["Seed:Enabled"] = "true",
+                ["Seed:AdminEmail"] = TestAdminEmail,
+                ["Seed:AdminPassword"] = TestAdminCredential
+            });
+        });
 
         builder.ConfigureServices(services =>
         {
@@ -101,6 +131,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<CustomWebApplicationFactory>>();
+
+        // Seed Identity roles (Admin, Customer) and test Admin using factory in-memory config overrides
+        await AppDbContextSeed.SeedIdentityAsync(scope.ServiceProvider, configuration, logger);
 
         // 1. Airports
         var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku", Aliases = "Baku,Bakı,Baki,Баку" };
