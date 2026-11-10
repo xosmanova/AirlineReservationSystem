@@ -6,14 +6,16 @@
 
 ---
 
-## 1. Cari vəziyyət (Gün 1-8 və hardening: TAMAMLANDI)
+## 1. Cari vəziyyət (Gün 1-11: TAMAMLANDI)
 
 - Solution `AirlineReservationSystem.slnx`, layihələr: `Domain`, `Application`, `Infrastructure`, `API`, `Admin` (MVC), `Client` (statik HTML/CSS/JS). Admin heç bir daxili qata istinad etmir.
 - Application: CQRS (**MediatR 12.5.0**, Apache 2.0), `ApiResponse<T>` zərfi, FluentValidation + `ValidationBehavior`, **Riok.Mapperly**, xüsusi exception-lar, `GlobalExceptionHandlerMiddleware`, `TimeProvider`.
 - Infrastructure: EF Core 10 + SQL Server (`.\SQLEXPRESS`), qlobal soft delete filtri, filtrli unikal indekslər, tool-generated migration, `Generic Repository` + `UnitOfWork`, seed.
 - Seed (demo data): 7 aeroport, 4 aviaşirkət, 8 təyyarə (DEMO-xxx), 1488 oturacaq, 60 günlük reyslər (hub əsaslı, üst-üstə düşmə yoxdur), ikitərəfli marşrut əhatəsi yoxlanılıb.
 - Gün 8: uçuş axtarışı və reys detalı (CQRS handler, `FlightsController`).
-- **Gün 9 (TAMAMLANDI):** axtarış SQL-də yenidən yazıldı (proyeksiya, alt sorğu ilə boş yer sayı, `passengersCount` filtri `OFFSET`-dən əvvəl, 2 komanda: data + `COUNT`, `Scheduled`/`Delayed` satılabilir, `PageSize` ≤ 50), fail-fast saat qurşağı, real SQL Server inteqrasiya test bazası (`AirlineReservationDb_Test`), Scalar + XML şərhləri. Commit-lər: `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`. Testlər: 62 (58 unit + 4 inteqrasiya).
+- **Gün 9 (TAMAMLANDI):** axtarış SQL-də yenidən yazıldı (proyeksiya, alt sorğu ilə boş yer sayı, `passengersCount` filtri `OFFSET`-dən əvvəl, 2 komanda: data + `COUNT`, `Scheduled`/`Delayed` satılabilir, `PageSize` ≤ 50), fail-fast saat qurşağı, real SQL Server inteqrasiya test bazası (`AirlineReservationDb_Test`), Scalar + XML şərhləri. Commit-lər: `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`.
+- **Gün 10 (TAMAMLANDI):** `ThenBy(f => f.Id)` tie-break, `TicketSpecifications` vahid aktiv bilet qaydası, `Airport.Aliases` + miqrasiya + seed, aviaşirkət adları yeniləndi, `GET /api/v1/airports?search=` və `GET /api/v1/airlines` endpoint-ləri + unit və inteqrasiya testləri (`36f4648`).
+- **Gün 11 (TAMAMLANDI):** ASP.NET Core Identity (`AppUser`, `AppRole` yalnız Infrastructure-da), `admin@airline.test` `user-secrets`-dən seed (`EmailConfirmed = true`), test fabriki `user-secrets`-dən təcrid edildi + `_Test` qoruyucusu + `FixedTimeProvider`, `Booking.UserId` məcburi `Guid` + `Restrict` FK (`MakeBookingUserRequired`), 97 test (74 unit + 23 inteqrasiya) yaşıl.
 - Köhnə plana görə **erkən yazılıb** (Gün 9-da yoxlanılır, Gün 13-də təmizlənir): oturacaq xəritəsi `GET /api/v1/flights/{id}/seatmap` (strukturlu JSON) və server tərəfli SVG köməkçi endpoint-i.
 
 ## 2. Dəyişməz qərarlar
@@ -68,32 +70,34 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Branch:** `fix/flight-search-polish`
 **Nəticə:** commit-lər `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`; 62 test yaşıl. Qalan 2 kiçik iş Gün 10-a keçdi.
 
-### Gün 10: Aeroport və aviaşirkət API, alias, reseed
+### Gün 10: Aeroport və aviaşirkət API, alias, reseed (TAMAMLANDI)
 **Branch:** `feat/airports-airlines-api`
-- [ ] **Gün 9-dan qalan:** hər sıralamaya unikal tie-break (`ThenBy(f => f.Id)`: çıxış vaxtı, qiymət, müddət). "Aktiv bilet" qaydası **tək bir ifadədir** (silinməyib, `IsCancelled` deyil, rezervasiya `Cancelled` deyil), axtarış və oturacaq xəritəsi eyni ifadəni istifadə edir. Test: eyni reys üçün ikisinin boş yer sayı eynidir
-- [ ] `Airport.Aliases` (vergüllə ayrılmış) + migration (alətlə). Seed alias-ları ASCII variantlarla: GYD `Baku,Bakı,Baki,Баку`, IST `Istanbul,İstanbul,Istanbul Airport,Стамбул`, SAW `Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул`, DXB `Dubai,Dubay,Дубай`, JFK `New York,Nyu-York,Нью-Йорк`, LHR `London,Londan,Лондон`, FRA `Frankfurt,Франкфурт`. Kollasiyaya güvənmə, `ə` və `ı` alias-larda açıq yazılır
-- [ ] Aviaşirkət adları: "Azerbaijan Airlines (AZAL)", "Turkish Airlines", "Emirates", "Lufthansa". Dev bazasını sıfırla (`dotnet ef database drop -f`) və yenidən seed et
-- [ ] `GET /api/v1/airports?search=` (IATA, ad, şəhər, alias; hərf registrinə həssas deyil; max 10; boş axtarış şəhər üzrə ilk 10). CQRS query, validator (uzunluq ≤ 50), `ApiResponse<List<AirportDto>>`. `GET /api/v1/airlines`. XML şərhləri və `ProducesResponseType`
-- [ ] Testlər: handler və validator unit testləri; inteqrasiya testləri (`Bakı`, `baku`, `Баку`, `GYD`, `ist`, `Sabiha` düzgün aeroportu tapır, tanımayan mətn boş siyahı qaytarır, xəta yox)
-**Commit-lər:** `fix(flights): add deterministic tie-break to flight ordering`, `refactor(flights): share active ticket rule between search and seat map`, `feat(airports): add airport aliases with migration and seed`, `feat(airports): add airport search endpoint`, `feat(airlines): add airlines endpoint`, `test(airports): cover alias search`
+- [x] **Gün 9-dan qalan:** hər sıralamaya unikal tie-break (`ThenBy(f => f.Id)`: çıxış vaxtı, qiymət, müddət). "Aktiv bilet" qaydası **tək bir ifadədir** (silinməyib, `IsCancelled` deyil, rezervasiya `Cancelled` deyil), axtarış və oturacaq xəritəsi eyni ifadəni istifadə edir. Test: eyni reys üçün ikisinin boş yer sayı eynidir
+- [x] `Airport.Aliases` (vergüllə ayrılmış) + migration (alətlə). Seed alias-ları ASCII variantlarla: GYD `Baku,Bakı,Baki,Баку`, IST `Istanbul,İstanbul,Istanbul Airport,Стамбул`, SAW `Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул`, DXB `Dubai,Dubay,Дубай`, JFK `New York,Nyu-York,Нью-Йорк`, LHR `London,Londan,Лондон`, FRA `Frankfurt,Франкфурт`. Kollasiyaya güvənmə, `ə` və `ı` alias-larda açıq yazılır
+- [x] Aviaşirkət adları: "Azerbaijan Airlines (AZAL)", "Turkish Airlines", "Emirates", "Lufthansa". Dev bazasını sıfırla (`dotnet ef database drop -f`) və yenidən seed et
+- [x] `GET /api/v1/airports?search=` (IATA, ad, şəhər, alias; hərf registrinə həssas deyil; max 10; boş axtarış şəhər üzrə ilk 10). CQRS query, validator (uzunluq ≤ 50), `ApiResponse<List<AirportDto>>`. `GET /api/v1/airlines`. XML şərhləri və `ProducesResponseType`
+- [x] Testlər: handler və validator unit testləri; inteqrasiya testləri (`Bakı`, `baku`, `Баку`, `GYD`, `ist`, `Sabiha` düzgün aeroportu tapır, tanımayan mətn boş siyahı qaytarır, xəta yox)
+**Commit-lər:** `fix(flights): add deterministic tie-break to flight ordering`, `refactor(flights): share active ticket rule between search and seat map`, `feat(airports): add airport aliases with migration and seed`, `feat(airports): add airport search endpoint`, `feat(airlines): add airlines endpoint`, `test(airports): cover alias search` (`develop`-a merge: `36f4648`)
 **Bitmə meyarı:** autocomplete `Bakı`, `Баку`, `ist` üçün düzgün aeroportları qaytarır, axtarış və xəritə eyni boş yer sayını göstərir.
 
-### Gün 11: ASP.NET Core Identity
+### Gün 11: ASP.NET Core Identity (TAMAMLANDI)
 **Branch:** `feat/identity-setup`
-- [ ] `AppUser : IdentityUser<Guid>`, `AppRole`, rollar `Admin` və `Customer` (Infrastructure, Domain Identity-ni tanımır)
-- [ ] Admin hesabı seed: parol `user-secrets`-dən, `appsettings`-də yoxdur. README-də "yalnız demo"
-- [ ] `Booking.UserId` üçün Infrastructure konfiqurasiyasında `AspNetUsers`-ə FK (`Restrict`) və indeks
-- [ ] Migration (alətlə), `has-pending-model-changes` exit 0
-**Commit-lər:** `feat(infra): add identity user and roles`, `feat(infra): seed admin from user secrets`, `feat(infra): link booking user to identity`
+- [x] `AppUser : IdentityUser<Guid>`, `AppRole`, rollar `Admin` və `Customer` (Infrastructure, Domain Identity-ni tanımır)
+- [x] Admin hesabı seed: **parol yalnız `user-secrets`/mühit dəyişənindən** (`Seed:AdminPassword`), `appsettings`-də yoxdur; parol yoxdursa xəbərdarlıq və atlama (default parol yoxdur). E-poçt qeyri-məxfi konfiqurasiyadan, ayrılmış test domeni (`admin@airline.test`), `EmailConfirmed = true`. README-də "yalnız demo" və parol nümunəsi yoxdur
+- [x] İnteqrasiya test fabriki admin e-poçtunu və test parolunu **özü konfiqurasiya override ilə verir** (`user-secrets`-ə güvənmir, test təkrarlanandır)
+- [x] `Booking.UserId` **məcburi `Guid`** (nullable deyil, qonaq rezervasiyası yoxdur) + Infrastructure konfiqurasiyasında `AspNetUsers`-ə FK (`Restrict`) və indeks (`MakeBookingUserRequired` yeni migration)
+- [x] Migration (alətlə), `has-pending-model-changes` exit 0
+**Commit-lər:** `92c2a0e`, `504d87e`, `9bfbaba`, `b647578`, `53d8418`, `5ccefb3`, `93ca12d`, `3c24ab3`
 **Bitmə meyarı:** Identity cədvəlləri bazadadır, admin hesabı secret-dən yaranır.
 
 ### Gün 12: JWT və `AuthController`
 **Branch:** `feat/jwt-auth`
+- [ ] Identity `AddIdentityCore<AppUser>().AddRoles<AppRole>().AddEntityFrameworkStores<AppDbContext>()` ilə (**cookie autentifikasiya sxemi yoxdur**). Default sxem JWT Bearer, tokensiz sorğu **401** qaytarır (302 yönləndirmə yox). Test ilə sübut et
 - [ ] `ITokenService` / `JwtTokenService` (claim-lər: Id, email, rol), açar `user-secrets`-də
 - [ ] `register` (rol `Customer`), `login`, `me`; parol siyasəti; validatorlar
 - [ ] `[Authorize]` və `[Authorize(Roles = "Admin")]`; Scalar-da Bearer "Authorize"
 - [ ] Yalnız login üçün daxili rate limiter (`AddRateLimiter`)
-- [ ] Testlər: token claim-ləri, səhv parol, rol yoxlaması
+- [ ] Testlər: token claim-ləri, səhv parol, rol yoxlaması. **Saat:** token verilməsi və yoxlanması **eyni `TimeProvider`-i** istifadə edir (dondurulmuş test saatı ilə real saat qarışmır), vaxtı bitmiş token 401 verir. Testlər real saata və sabit təqvim tarixinə bağlı olmamalıdır
 **Commit-lər:** `feat(auth): add jwt token service`, `feat(api): add register login and me endpoints`, `feat(api): add login rate limiter`, `test(auth): cover token and role checks`
 **Bitmə meyarı:** Scalar-da qeydiyyat, giriş, token ilə `me` işləyir, qorunan endpoint tokensiz 401 verir.
 
@@ -102,7 +106,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 `GET /api/v1/flights/{id}/seatmap` artıq var (köhnə Gün 9). Bu gün onu **kilid və blokla uyğun** edirik.
 - [ ] `SeatMapDto` müqaviləsi: `bool IsOccupied` → `Status` (`Available`, `Occupied`, `Held`, `Blocked`, JSON-da mətn kimi, `JsonStringEnumConverter`) və `heldByMe` (token varsa). **`SvgMap` əsas cavabdan çıxarılır** (hər sorğuda yüzlərlə oturacağın SVG sətri göndərmək lazımsızdır; server tərəfli SVG ayrıca endpoint kimi qala bilər, Client xəritəni JSON-dan çəkir). `FlightSeatDto` adı `SeatDto` olur (`FlightSeat` entity-si yoxdur)
 - [ ] Doluluq sorğusu yalnız aktiv biletləri sayır (ləğv, silinmiş, `Cancelled` rezervasiya çıxarılır, bu hissə var). Bütün uçuşu bilet və rezervasiyalarla yükləmək əvəzinə **`Select` proyeksiyası** ilə tək sorğu
-- [ ] `PricingService`: `BasePrice × Seat.PriceMultiplier` (business, exit row), pəncərə/keçid əlavə haqqı (konfiqurasiya), son 3 gündə tələbat çarpanı (default ×1.2). Xəritədəki `Price` **yalnız bu servisdən** gəlir (iki ayrı qiymət məntiqi olmasın)
+- [ ] `PricingService`: `BasePrice × Seat.BasePriceMultiplier` (business, exit row), pəncərə/keçid əlavə haqqı (konfiqurasiya), son 3 gündə tələbat çarpanı (default ×1.2). Xəritədəki `Price` **yalnız bu servisdən** gəlir (iki ayrı qiymət məntiqi olmasın)
 - [ ] `POST /api/v1/bookings/quote` (flightId, seatIds) → sətir-sətir döküm və yekun
 - [ ] Testlər: xəritə statusları, table-driven qiymət testləri (economy, business, exit row, pəncərə, tələbat, yuvarlaqlaşdırma)
 **Commit-lər:** `refactor(seats): replace occupied flag with seat status and drop svg from main dto`, `perf(seats): project seat map in a single query`, `feat(pricing): add pricing service with configurable fees`, `feat(bookings): add quote endpoint`, `test(pricing): add table driven pricing tests`
