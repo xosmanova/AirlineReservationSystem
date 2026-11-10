@@ -36,7 +36,7 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
             .FirstOrDefaultAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Include(b => b.Payment)
