@@ -1,3 +1,4 @@
+using AirlineReservation.API.Extensions;
 using AirlineReservation.API.Middlewares;
 using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Extensions;
@@ -31,8 +32,10 @@ builder.Services.AddApplicationServices();
 
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddJwtAuthentication();
+builder.Services.AddLoginRateLimiting();
 
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerAndScalarOpenApi();
 
 var app = builder.Build();
 
@@ -69,11 +72,13 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("Airline Reservation API")
-               .WithTheme(ScalarTheme.Moon);
+               .WithTheme(ScalarTheme.Moon)
+               .AddPreferredSecuritySchemes("Bearer");
     });
 }
 
 app.UseCors("AllowClient");
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

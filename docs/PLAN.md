@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Cari vəziyyət (Gün 1-11: TAMAMLANDI)
+## 1. Cari vəziyyət (Gün 1-12: TAMAMLANDI)
 
 - Solution `AirlineReservationSystem.slnx`, layihələr: `Domain`, `Application`, `Infrastructure`, `API`, `Admin` (MVC), `Client` (statik HTML/CSS/JS). Admin heç bir daxili qata istinad etmir.
 - Application: CQRS (**MediatR 12.5.0**, Apache 2.0), `ApiResponse<T>` zərfi, FluentValidation + `ValidationBehavior`, **Riok.Mapperly**, xüsusi exception-lar, `GlobalExceptionHandlerMiddleware`, `TimeProvider`.
@@ -16,6 +16,7 @@
 - **Gün 9 (TAMAMLANDI):** axtarış SQL-də yenidən yazıldı (proyeksiya, alt sorğu ilə boş yer sayı, `passengersCount` filtri `OFFSET`-dən əvvəl, 2 komanda: data + `COUNT`, `Scheduled`/`Delayed` satılabilir, `PageSize` ≤ 50), fail-fast saat qurşağı, real SQL Server inteqrasiya test bazası (`AirlineReservationDb_Test`), Scalar + XML şərhləri. Commit-lər: `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`.
 - **Gün 10 (TAMAMLANDI):** `ThenBy(f => f.Id)` tie-break, `TicketSpecifications` vahid aktiv bilet qaydası, `Airport.Aliases` + miqrasiya + seed, aviaşirkət adları yeniləndi, `GET /api/v1/airports?search=` və `GET /api/v1/airlines` endpoint-ləri + unit və inteqrasiya testləri (`36f4648`).
 - **Gün 11 (TAMAMLANDI):** ASP.NET Core Identity (`AppUser`, `AppRole` yalnız Infrastructure-da), `admin@airline.test` `user-secrets`-dən seed (`EmailConfirmed = true`), test fabriki `user-secrets`-dən təcrid edildi + `_Test` qoruyucusu + `FixedTimeProvider`, `Booking.UserId` məcburi `Guid` + `Restrict` FK (`MakeBookingUserRequired`), 97 test (74 unit + 23 inteqrasiya) yaşıl.
+- **Gün 12 (TAMAMLANDI):** Stateless JWT Bearer auth (`AddIdentityCore` — cookie sxemi yoxdur, tokensiz `401`), `ITokenService` / `JwtTokenService` (`Jwt:Key` `user-secrets`-dən, `TimeProvider` sinxron `LifetimeValidator`), `AuthController` (`register`, `login`, `me`, `admin-check`), Scalar Bearer "Authorize", login-only `AddRateLimiter`, 133 test (96 unit + 37 inteqrasiya) yaşıl.
 - Köhnə plana görə **erkən yazılıb** (Gün 9-da yoxlanılır, Gün 13-də təmizlənir): oturacaq xəritəsi `GET /api/v1/flights/{id}/seatmap` (strukturlu JSON) və server tərəfli SVG köməkçi endpoint-i.
 
 ## 2. Dəyişməz qərarlar
@@ -90,15 +91,15 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Commit-lər:** `92c2a0e`, `504d87e`, `9bfbaba`, `b647578`, `53d8418`, `5ccefb3`, `93ca12d`, `3c24ab3`
 **Bitmə meyarı:** Identity cədvəlləri bazadadır, admin hesabı secret-dən yaranır.
 
-### Gün 12: JWT və `AuthController`
+### Gün 12: JWT və `AuthController` (TAMAMLANDI)
 **Branch:** `feat/jwt-auth`
-- [ ] Identity `AddIdentityCore<AppUser>().AddRoles<AppRole>().AddEntityFrameworkStores<AppDbContext>()` ilə (**cookie autentifikasiya sxemi yoxdur**). Default sxem JWT Bearer, tokensiz sorğu **401** qaytarır (302 yönləndirmə yox). Test ilə sübut et
-- [ ] `ITokenService` / `JwtTokenService` (claim-lər: Id, email, rol), açar `user-secrets`-də
-- [ ] `register` (rol `Customer`), `login`, `me`; parol siyasəti; validatorlar
-- [ ] `[Authorize]` və `[Authorize(Roles = "Admin")]`; Scalar-da Bearer "Authorize"
-- [ ] Yalnız login üçün daxili rate limiter (`AddRateLimiter`)
-- [ ] Testlər: token claim-ləri, səhv parol, rol yoxlaması. **Saat:** token verilməsi və yoxlanması **eyni `TimeProvider`-i** istifadə edir (dondurulmuş test saatı ilə real saat qarışmır), vaxtı bitmiş token 401 verir. Testlər real saata və sabit təqvim tarixinə bağlı olmamalıdır
-**Commit-lər:** `feat(auth): add jwt token service`, `feat(api): add register login and me endpoints`, `feat(api): add login rate limiter`, `test(auth): cover token and role checks`
+- [x] Identity `AddIdentityCore<AppUser>().AddRoles<AppRole>().AddEntityFrameworkStores<AppDbContext>()` ilə (**cookie autentifikasiya sxemi yoxdur**). Default sxem JWT Bearer, tokensiz sorğu **401** qaytarır (302 yönləndirmə yox). Test ilə sübut et
+- [x] `ITokenService` / `JwtTokenService` (claim-lər: Id, email, rol), açar `user-secrets`-də
+- [x] `register` (rol `Customer`), `login`, `me`; parol siyasəti; validatorlar
+- [x] `[Authorize]` və `[Authorize(Roles = "Admin")]`; Scalar-da Bearer "Authorize"
+- [x] Yalnız login üçün daxili rate limiter (`AddRateLimiter`)
+- [x] Testlər: token claim-ləri, səhv parol, rol yoxlaması. **Saat:** token verilməsi və yoxlanması **eyni `TimeProvider`-i** istifadə edir (dondurulmuş test saatı ilə real saat qarışmır), vaxtı bitmiş token 401 verir. Testlər real saata və sabit təqvim tarixinə bağlı olmamalıdır
+**Commit-lər:** `c0d044e`, `18c7c4f`, `c885e39`, `1d6295e`, `bd62811`
 **Bitmə meyarı:** Scalar-da qeydiyyat, giriş, token ilə `me` işləyir, qorunan endpoint tokensiz 401 verir.
 
 ### Gün 13: Oturacaq xəritəsi müqaviləsinin təmizlənməsi, qiymət və quote
