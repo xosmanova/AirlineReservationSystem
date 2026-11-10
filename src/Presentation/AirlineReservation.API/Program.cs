@@ -1,3 +1,4 @@
+using AirlineReservation.API.Extensions;
 using AirlineReservation.API.Middlewares;
 using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Extensions;
@@ -31,6 +32,7 @@ builder.Services.AddApplicationServices();
 
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddJwtAuthentication();
 
 builder.Services.AddOpenApi();
 

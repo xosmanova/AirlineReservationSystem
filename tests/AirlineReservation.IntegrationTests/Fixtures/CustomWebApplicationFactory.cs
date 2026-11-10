@@ -25,6 +25,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     public const string TestAdminEmail = "admin@airline.test";
     public string TestAdminCredential { get; } = $"AirlineTest!{Guid.NewGuid():N}aA1";
+    public string TestJwtKey { get; } = $"{Guid.NewGuid():N}{Guid.NewGuid():N}";
 
     public int TestFlight1Id { get; private set; }
     public int TestFlight2DelayedId { get; private set; }
@@ -54,7 +55,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
                 ["Seed:Enabled"] = "true",
                 ["Seed:AdminEmail"] = TestAdminEmail,
-                ["Seed:AdminPassword"] = TestAdminCredential
+                ["Seed:AdminPassword"] = TestAdminCredential,
+                ["Jwt:Issuer"] = "AirlineReservation.API",
+                ["Jwt:Audience"] = "AirlineReservation.Client",
+                ["Jwt:ExpiryMinutes"] = "60",
+                ["Jwt:Key"] = TestJwtKey
             });
         });
 
