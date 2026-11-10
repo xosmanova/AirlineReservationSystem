@@ -30,6 +30,8 @@ Bu fayl SkyReserve layihəsi üzərində işləyən developer və AI agent-in ri
    Tranzitiv `NU1903` yüksək dərəcəli zəiflik xəbərdarlığını susdurmaq üçün `10.0.14` versiyasında saxlanılır və `.csproj` faylında müvafiq XML şərhlə sənədləşdirilir.
 4. **Zaman və Saat Qurşağı İdarəetməsi (TimeProvider):**
    Kod bazasında birbaşa `DateTime.UtcNow` və ya `DateTime.Now` çağırışları qadağandır. Həmişə `TimeProvider.GetUtcNow()` (və ya `IBusinessTime` servisi) inyeksiya olunmalıdır ki, xUnit testlərində `FakeTimeProvider` ilə zaman dəqiq simulyasiya edilə bilsin.
+5. **Test Clock Independence Rule:**
+   Tests must never depend on the real clock or on a hard-coded calendar date. Use one fixed or fake TimeProvider and build all test dates relative to it. Token issuing and token validation must use the same time source.
 
 ---
 
