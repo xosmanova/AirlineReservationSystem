@@ -17,54 +17,58 @@ public static class RateLimitingExtensions
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public static IServiceCollection AddLoginRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLoginRateLimiting(this IServiceCollection services)
     {
-        int permitLimit = configuration.GetValue<int?>("RateLimiting:Login:PermitLimit") ?? 5;
-        int windowSeconds = configuration.GetValue<int?>("RateLimiting:Login:WindowSeconds") ?? 60;
+        services.AddRateLimiter();
 
-        if (permitLimit <= 0) permitLimit = 5;
-        if (windowSeconds <= 0) windowSeconds = 60;
-
-        services.AddRateLimiter(options =>
-        {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-            options.AddPolicy(LoginPolicy, httpContext =>
+        // Bind configuration via AddOptions<RateLimiterOptions> so test host overrides apply cleanly
+        services.AddOptions<RateLimiterOptions>()
+            .Configure<IConfiguration>((options, configuration) =>
             {
-                var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                int permitLimit = configuration.GetValue<int?>("RateLimiting:Login:PermitLimit") ?? 5;
+                int windowSeconds = configuration.GetValue<int?>("RateLimiting:Login:WindowSeconds") ?? 60;
 
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = permitLimit,
-                        Window = TimeSpan.FromSeconds(windowSeconds),
-                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = 0,
-                        AutoReplenishment = true
-                    });
-            });
+                if (permitLimit <= 0) permitLimit = 5;
+                if (windowSeconds <= 0) windowSeconds = 60;
 
-            options.OnRejected = async (context, cancellationToken) =>
-            {
-                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-                context.HttpContext.Response.ContentType = "application/json";
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                options.AddPolicy(LoginPolicy, httpContext =>
                 {
-                    context.HttpContext.Response.Headers.RetryAfter =
-                        ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-                }
+                    var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-                var response = ApiResponse.FailureResult(
-                    "Too many login attempts. Please try again later.",
-                    statusCode: StatusCodes.Status429TooManyRequests);
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey,
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = permitLimit,
+                            Window = TimeSpan.FromSeconds(windowSeconds),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        });
+                });
 
-                await context.HttpContext.Response.WriteAsync(
-                    JsonSerializer.Serialize(response, JsonOptions),
-                    cancellationToken);
-            };
-        });
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    context.HttpContext.Response.ContentType = "application/json";
+
+                    if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    {
+                        context.HttpContext.Response.Headers.RetryAfter =
+                            ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                    }
+
+                    var response = ApiResponse.FailureResult(
+                        "Too many login attempts. Please try again later.",
+                        statusCode: StatusCodes.Status429TooManyRequests);
+
+                    await context.HttpContext.Response.WriteAsync(
+                        JsonSerializer.Serialize(response, JsonOptions),
+                        cancellationToken);
+                };
+            });
 
         return services;
     }
