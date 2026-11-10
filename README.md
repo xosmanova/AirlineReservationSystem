@@ -64,6 +64,8 @@ dotnet ef migrations add <MiqrasiyaAdi> --project src/Infrastructure/AirlineRese
 
 > **QEYD:** `EnsureCreatedAsync()` metodundan qətiyyən istifadə olunmur. Yalnız `Program.cs` daxilində Development mühitində `await dbContext.Database.MigrateAsync()` işlədilir.
 
+> **QEYD (`MakeBookingUserRequired`):** `20261110104715_MakeBookingUserRequired` miqrasiyası `Bookings.UserId` sütunu üçün `defaultValue: Guid.Empty` (`00000000-0000-0000-0000-000000000000`) ehtiva etdiyinə görə yalnız boş `Bookings` cədvəli üzərində tətbiq edilməlidir.
+
 ---
 
 ### Layihə Qovluq Quruluşu
