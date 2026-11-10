@@ -40,6 +40,17 @@ Layihədə istifadə olunan bütün uçuş, təyyarə və oturacaq məlumatları
 
 ---
 
+### Autentifikasiya və Təhlükəsizlik (Identity & User Secrets)
+* **ASP.NET Core Identity:** İstifadəçi və rol idarəetməsi `IdentityDbContext<AppUser, AppRole, Guid>` üzərindən aparılır. Rollar: `Admin`, `Customer`.
+* **Parol Siyasəti:** Minimum 8 simvol, rəqəm, böyük hərf, kiçik hərf və xüsusi simvol tələb olunur.
+* **Yalnız Demo Üçün İlkin Admin Quraşdırması (`admin@airline.test`):** İnkişaf (Development) mühitində yaradılan admin hesabı yalnız demo və test məqsədlidir. Admin parolu kod bazasında və ya `appsettings.json` faylında ƏSLA saxlanılmır. Parol `dotnet user-secrets` vasitəsilə təyin edilir:
+  ```powershell
+  dotnet user-secrets set "Seed:AdminPassword" '<parolunuz>' --project src/Presentation/AirlineReservation.API
+  ```
+  Əgər `Seed:AdminPassword` təyin edilməyibsə, sistem qəzaya uğramır (fail-safe), konsola xəbərdarlıq yazaraq admin istifadəçisinin yaradılmasını təhlükəsiz şəkildə ötürür.
+
+---
+
 ### Baza Miqrasiyaları Qaydası (Migration Workflow)
 Model dəyişikliklərinin miqrasiya snapshot-u ilə tam sinxron olduğunu yoxlamaq üçün (mütləq exit code 0 qaytarmalıdır):
 ```powershell
@@ -52,6 +63,8 @@ dotnet ef migrations add <MiqrasiyaAdi> --project src/Infrastructure/AirlineRese
 ```
 
 > **QEYD:** `EnsureCreatedAsync()` metodundan qətiyyən istifadə olunmur. Yalnız `Program.cs` daxilində Development mühitində `await dbContext.Database.MigrateAsync()` işlədilir.
+
+> **QEYD (`MakeBookingUserRequired`):** `20261110104715_MakeBookingUserRequired` miqrasiyası `Bookings.UserId` sütunu üçün `defaultValue: Guid.Empty` (`00000000-0000-0000-0000-000000000000`) ehtiva etdiyinə görə yalnız boş `Bookings` cədvəli üzərində tətbiq edilməlidir.
 
 ---
 

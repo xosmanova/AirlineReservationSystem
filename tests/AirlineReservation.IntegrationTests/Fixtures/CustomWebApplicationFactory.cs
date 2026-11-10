@@ -1,13 +1,20 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
 using AirlineReservation.Infrastructure.Context;
+using AirlineReservation.Infrastructure.Identity.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AirlineReservation.IntegrationTests.Fixtures;
 
@@ -15,6 +22,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string TestConnectionString =
         "Server=.\\SQLEXPRESS;Database=AirlineReservationDb_Test;Trusted_Connection=True;TrustServerCertificate=True;";
+
+    public const string TestAdminEmail = "admin@airline.test";
+    public string TestAdminCredential { get; } = $"AirlineTest!{Guid.NewGuid():N}aA1";
 
     public int TestFlight1Id { get; private set; }
     public int TestFlight2DelayedId { get; private set; }
@@ -25,6 +35,28 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        builder.ConfigureAppConfiguration((_, configBuilder) =>
+        {
+            // Explicitly clear any user-secrets (secrets.json) source so tests never depend on machine secrets
+            for (int i = configBuilder.Sources.Count - 1; i >= 0; i--)
+            {
+                if (configBuilder.Sources[i] is JsonConfigurationSource jsonSource &&
+                    string.Equals(Path.GetFileName(jsonSource.Path), "secrets.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    configBuilder.Sources.RemoveAt(i);
+                }
+            }
+
+            // Supply deterministic in-memory configuration overrides
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] = TestConnectionString,
+                ["Seed:Enabled"] = "true",
+                ["Seed:AdminEmail"] = TestAdminEmail,
+                ["Seed:AdminPassword"] = TestAdminCredential
+            });
+        });
 
         builder.ConfigureServices(services =>
         {
@@ -38,6 +70,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // Register AppDbContext with isolated test database
             services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(TestConnectionString));
+
+            // Replace TimeProvider with a deterministic clock before test flight departure (08:00Z on 2026-11-10)
+            var timeDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(TimeProvider));
+            if (timeDescriptor != null)
+            {
+                services.Remove(timeDescriptor);
+            }
+            services.AddSingleton<TimeProvider>(
+                new FixedTimeProvider(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero)));
         });
     }
 
@@ -45,6 +86,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        EnsureTestDatabaseOrThrow(context);
+
+        if (await context.Database.CanConnectAsync() &&
+            (await context.Database.GetPendingMigrationsAsync()).Any())
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('dbo.Tickets', 'U') IS NOT NULL DELETE FROM [Tickets];
+                IF OBJECT_ID('dbo.Bookings', 'U') IS NOT NULL DELETE FROM [Bookings];
+            ");
+        }
+
         await context.Database.MigrateAsync();
     }
 
@@ -52,6 +105,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        EnsureTestDatabaseOrThrow(context);
 
         await context.Database.ExecuteSqlRawAsync(@"
             DELETE FROM [Tickets];
@@ -62,6 +117,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             DELETE FROM [Aircrafts];
             DELETE FROM [Airlines];
             DELETE FROM [Airports];
+            DELETE FROM [AspNetUserRoles];
+            DELETE FROM [AspNetUserClaims];
+            DELETE FROM [AspNetUserLogins];
+            DELETE FROM [AspNetUserTokens];
+            DELETE FROM [AspNetUsers];
+            DELETE FROM [AspNetRoleClaims];
+            DELETE FROM [AspNetRoles];
         ");
     }
 
@@ -69,6 +131,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<CustomWebApplicationFactory>>();
+
+        // Seed Identity roles (Admin, Customer) and test Admin using factory in-memory config overrides
+        await AppDbContextSeed.SeedIdentityAsync(scope.ServiceProvider, configuration, logger);
 
         // 1. Airports
         var gyd = new Airport { IataCode = "GYD", Name = "Heydar Aliyev Int.", City = "Baku", Country = "Azerbaijan", TimeZone = "Asia/Baku", Aliases = "Baku,Bakı,Baki,Баку" };
@@ -143,9 +210,25 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         context.Flights.AddRange(f1, f2, f3);
 
+        // Seed required owner user for test Booking
+        var testUser = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "customer@airline.test",
+            NormalizedUserName = "CUSTOMER@AIRLINE.TEST",
+            Email = "customer@airline.test",
+            NormalizedEmail = "CUSTOMER@AIRLINE.TEST",
+            EmailConfirmed = true,
+            SecurityStamp = Guid.NewGuid().ToString(),
+            FirstName = "Ali",
+            LastName = "Aliyev"
+        };
+        context.Users.Add(testUser);
+
         // Booking & Ticket for Flight 1 (Seat 1A occupied, leaving 1 free seat on Flight 1)
         var booking = new Booking
         {
+            UserId = testUser.Id,
             PnrCode = "TEST01",
             ContactEmail = "test@example.com",
             ContactPhone = "+994501234567",
@@ -201,5 +284,33 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         TestFlight3CancelledId = f3.Id;
         TestDepartureAirportId = gyd.Id;
         TestArrivalAirportId = ist.Id;
+    }
+
+    private static void EnsureTestDatabaseOrThrow(AppDbContext context)
+    {
+        EnsureTestDatabaseOrThrow(context.Database.GetConnectionString());
+    }
+
+    public static void EnsureTestDatabaseOrThrow(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("SAFETY GUARD: Connection string is missing. Refusing database cleanup.");
+        }
+
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        var databaseName = builder.InitialCatalog;
+
+        if (string.IsNullOrWhiteSpace(databaseName) ||
+            !databaseName.EndsWith("_Test", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"SAFETY GUARD: Refusing database cleanup on '{databaseName}'. Integration test cleanup may only run on a database ending with '_Test'.");
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset fixedUtcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => fixedUtcNow;
     }
 }

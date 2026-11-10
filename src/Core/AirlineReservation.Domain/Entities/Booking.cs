@@ -6,7 +6,7 @@ namespace AirlineReservation.Domain.Entities;
 public class Booking : BaseEntity
 {
     public string PnrCode { get; set; } = string.Empty; // 6-character alphanumeric, e.g. "AZ78KD"
-    public string? UserId { get; set; }                 // Optional linked identity user (null for guest checkout)
+    public Guid UserId { get; set; }                  // Required identity user (no guest checkout)
 
     public decimal TotalAmount { get; set; }
     public BookingStatus Status { get; set; } = BookingStatus.Pending;

@@ -29,7 +29,7 @@ builder.Services.AddCors(options =>
 // Register Application Services (MediatR CQRS, Riok.Mapperly, IBusinessTime)
 builder.Services.AddApplicationServices();
 
-// Register Infrastructure Services (EF Core, Repositories, Unit of Work)
+// Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
 builder.Services.AddOpenApi();
@@ -51,6 +51,9 @@ if (app.Environment.IsDevelopment())
 
         Console.WriteLine("Seeding initial aviation data...");
         await AppDbContextSeed.SeedAsync(dbContext, app.Configuration, app.Logger);
+
+        Console.WriteLine("Seeding identity roles and admin user...");
+        await AppDbContextSeed.SeedIdentityAsync(scope.ServiceProvider, app.Configuration, app.Logger);
         Console.WriteLine("Database migrated and seeded successfully!");
     }
     catch (Exception ex)
@@ -72,6 +75,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowClient");
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

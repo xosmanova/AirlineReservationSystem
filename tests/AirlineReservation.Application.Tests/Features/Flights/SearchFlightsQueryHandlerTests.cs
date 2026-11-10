@@ -48,7 +48,7 @@ public class SearchFlightsQueryHandlerTests
         };
 
         // Add 2 confirmed tickets
-        var confirmedBooking = new Booking { Id = 1, PnrCode = "PNR001", Status = BookingStatus.Confirmed, IsDeleted = false };
+        var confirmedBooking = new Booking { Id = 1, UserId = Guid.NewGuid(), PnrCode = "PNR001", Status = BookingStatus.Confirmed, IsDeleted = false };
         flight.Tickets.Add(new Ticket { Id = 1, FlightId = flightId, SeatId = 1, IsCancelled = false, IsDeleted = false, Booking = confirmedBooking });
         flight.Tickets.Add(new Ticket { Id = 2, FlightId = flightId, SeatId = 2, IsCancelled = false, IsDeleted = false, Booking = confirmedBooking });
 
@@ -56,7 +56,7 @@ public class SearchFlightsQueryHandlerTests
         flight.Tickets.Add(new Ticket { Id = 3, FlightId = flightId, SeatId = 3, IsCancelled = true, IsDeleted = false, Booking = confirmedBooking });
 
         // Add 1 ticket with expired booking (should not count as occupied)
-        var expiredBooking = new Booking { Id = 2, PnrCode = "PNR002", Status = BookingStatus.Expired, IsDeleted = false };
+        var expiredBooking = new Booking { Id = 2, UserId = Guid.NewGuid(), PnrCode = "PNR002", Status = BookingStatus.Expired, IsDeleted = false };
         flight.Tickets.Add(new Ticket { Id = 4, FlightId = flightId, SeatId = 4, IsCancelled = false, IsDeleted = false, Booking = expiredBooking });
 
         return (flight, aircraft);
