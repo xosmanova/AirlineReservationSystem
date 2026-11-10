@@ -7,6 +7,7 @@ using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Identity.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -56,6 +57,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        EnsureTestDatabaseOrThrow(context);
+
         if (await context.Database.CanConnectAsync() &&
             (await context.Database.GetPendingMigrationsAsync()).Any())
         {
@@ -72,6 +75,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        EnsureTestDatabaseOrThrow(context);
 
         await context.Database.ExecuteSqlRawAsync(@"
             DELETE FROM [Tickets];
@@ -244,6 +249,29 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         TestFlight3CancelledId = f3.Id;
         TestDepartureAirportId = gyd.Id;
         TestArrivalAirportId = ist.Id;
+    }
+
+    private static void EnsureTestDatabaseOrThrow(AppDbContext context)
+    {
+        EnsureTestDatabaseOrThrow(context.Database.GetConnectionString());
+    }
+
+    public static void EnsureTestDatabaseOrThrow(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("SAFETY GUARD: Connection string is missing. Refusing database cleanup.");
+        }
+
+        var builder = new SqlConnectionStringBuilder(connectionString);
+        var databaseName = builder.InitialCatalog;
+
+        if (string.IsNullOrWhiteSpace(databaseName) ||
+            !databaseName.EndsWith("_Test", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"SAFETY GUARD: Refusing database cleanup on '{databaseName}'. Integration test cleanup may only run on a database ending with '_Test'.");
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset fixedUtcNow) : TimeProvider
