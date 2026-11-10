@@ -31,12 +31,15 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .IsRequired()
             .HasMaxLength(30);
 
-        // Optional relationship to AspNetUsers (Identity AppUser) with Restrict delete behavior
+        // Required relationship to AspNetUsers (Identity AppUser) with Restrict delete behavior
+        builder.Property(b => b.UserId)
+            .IsRequired();
+
         builder.HasOne<AppUser>()
             .WithMany()
             .HasForeignKey(b => b.UserId)
             .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
+            .IsRequired();
 
         builder.HasIndex(b => b.UserId);
 

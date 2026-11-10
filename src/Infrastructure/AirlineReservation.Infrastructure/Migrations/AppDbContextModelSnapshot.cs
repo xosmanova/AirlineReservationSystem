@@ -202,7 +202,7 @@ namespace AirlineReservation.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("UserId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
@@ -715,7 +715,8 @@ namespace AirlineReservation.Infrastructure.Migrations
                     b.HasOne("AirlineReservation.Infrastructure.Identity.Entities.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("AirlineReservation.Domain.Entities.Flight", b =>

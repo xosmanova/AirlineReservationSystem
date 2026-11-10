@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
 using AirlineReservation.Infrastructure.Context;
+using AirlineReservation.Infrastructure.Identity.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (await context.Database.CanConnectAsync() &&
+            (await context.Database.GetPendingMigrationsAsync()).Any())
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('dbo.Tickets', 'U') IS NOT NULL DELETE FROM [Tickets];
+                IF OBJECT_ID('dbo.Bookings', 'U') IS NOT NULL DELETE FROM [Bookings];
+            ");
+        }
+
         await context.Database.MigrateAsync();
     }
 
@@ -71,6 +82,13 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             DELETE FROM [Aircrafts];
             DELETE FROM [Airlines];
             DELETE FROM [Airports];
+            DELETE FROM [AspNetUserRoles];
+            DELETE FROM [AspNetUserClaims];
+            DELETE FROM [AspNetUserLogins];
+            DELETE FROM [AspNetUserTokens];
+            DELETE FROM [AspNetUsers];
+            DELETE FROM [AspNetRoleClaims];
+            DELETE FROM [AspNetRoles];
         ");
     }
 
@@ -152,9 +170,25 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         context.Flights.AddRange(f1, f2, f3);
 
+        // Seed required owner user for test Booking
+        var testUser = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "customer@airline.test",
+            NormalizedUserName = "CUSTOMER@AIRLINE.TEST",
+            Email = "customer@airline.test",
+            NormalizedEmail = "CUSTOMER@AIRLINE.TEST",
+            EmailConfirmed = true,
+            SecurityStamp = Guid.NewGuid().ToString(),
+            FirstName = "Ali",
+            LastName = "Aliyev"
+        };
+        context.Users.Add(testUser);
+
         // Booking & Ticket for Flight 1 (Seat 1A occupied, leaving 1 free seat on Flight 1)
         var booking = new Booking
         {
+            UserId = testUser.Id,
             PnrCode = "TEST01",
             ContactEmail = "test@example.com",
             ContactPhone = "+994501234567",

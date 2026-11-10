@@ -41,7 +41,7 @@ public class GetFlightSeatMapQueryHandlerTests
         };
 
         // Seat 102 is booked with Confirmed booking
-        var booking = new Booking { Id = 1, PnrCode = "ABC123", Status = BookingStatus.Confirmed, IsDeleted = false };
+        var booking = new Booking { Id = 1, UserId = Guid.NewGuid(), PnrCode = "ABC123", Status = BookingStatus.Confirmed, IsDeleted = false };
         flight.Tickets.Add(new Ticket { Id = 1, FlightId = flightId, SeatId = 102, IsCancelled = false, IsDeleted = false, Booking = booking });
 
         return flight;
