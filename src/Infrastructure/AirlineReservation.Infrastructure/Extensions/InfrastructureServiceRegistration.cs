@@ -41,6 +41,7 @@ public static class InfrastructureServiceRegistration
         // Bind JWT configuration (signing key supplied strictly via user-secrets or environment)
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
         services.AddSingleton<ITokenService, JwtTokenService>();
+        services.AddScoped<IAuthService, IdentityAuthService>();
 
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         services.AddScoped<IFlightRepository, FlightRepository>();

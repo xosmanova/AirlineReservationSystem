@@ -43,6 +43,14 @@ public class GlobalExceptionHandlerMiddleware
                 (int)HttpStatusCode.NotFound,
                 ApiResponse.FailureResult(notFoundEx.Message, statusCode: (int)HttpStatusCode.NotFound)
             ),
+            UnauthorizedException unauthorizedEx => (
+                (int)HttpStatusCode.Unauthorized,
+                ApiResponse.FailureResult(unauthorizedEx.Message, statusCode: (int)HttpStatusCode.Unauthorized)
+            ),
+            ForbiddenException forbiddenEx => (
+                (int)HttpStatusCode.Forbidden,
+                ApiResponse.FailureResult(forbiddenEx.Message, statusCode: (int)HttpStatusCode.Forbidden)
+            ),
             AppValidationException validationEx => (
                 (int)HttpStatusCode.BadRequest,
                 ApiResponse.FailureResult(

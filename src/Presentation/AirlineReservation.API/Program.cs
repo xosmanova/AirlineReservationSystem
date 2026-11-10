@@ -34,7 +34,7 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddJwtAuthentication();
 
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerAndScalarOpenApi();
 
 var app = builder.Build();
 
@@ -71,7 +71,8 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("Airline Reservation API")
-               .WithTheme(ScalarTheme.Moon);
+               .WithTheme(ScalarTheme.Moon)
+               .AddPreferredSecuritySchemes("Bearer");
     });
 }
 
