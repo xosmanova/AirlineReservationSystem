@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using AirlineReservation.Application.Common.Models;
+using Microsoft.Extensions.Options;
 using AirlineReservation.API.Extensions;
 using AirlineReservation.API.Middlewares;
 using AirlineReservation.Application.Common.Helpers;
@@ -34,6 +36,13 @@ builder.Services.AddCors(options =>
 
 // Register Application Services (MediatR CQRS, Riok.Mapperly, IBusinessTime)
 builder.Services.AddApplicationServices();
+builder.Services.AddOptions<PricingSettings>()
+    .Bind(builder.Configuration.GetSection(PricingSettings.SectionName))
+    .Validate(
+        settings => settings.IsValid(out _),
+        "Invalid Pricing configuration: WindowFee, AisleFee, and LastMinuteDays must be >= 0, and LastMinuteMultiplier must be >= 1.0.")
+    .ValidateOnStart();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<PricingSettings>>().Value);
 
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);

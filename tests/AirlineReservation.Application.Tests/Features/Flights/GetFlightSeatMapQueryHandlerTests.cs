@@ -1,5 +1,7 @@
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
+using AirlineReservation.Application.Common.Models;
+using AirlineReservation.Application.Common.Services;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
@@ -13,7 +15,17 @@ namespace AirlineReservation.Application.Tests.Features.Flights;
 
 public class GetFlightSeatMapQueryHandlerTests
 {
-    private static Flight CreateFlightWithSeats(int flightId = 1)
+    private static readonly DateTimeOffset FixedUtcNow = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+
+    private sealed class FakeClock(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private static PricingService CreatePricingService()
+        => new(new PricingSettings(), new FakeClock(FixedUtcNow));
+
+    private static Flight CreateFlightWithSeats(int flightId = 1, int daysUntilDeparture = 10)
     {
         var azal = new Airline { Id = 1, Code = "J2", Name = "Azerbaijan Airlines (AZAL)" };
         var aircraft = new Aircraft { Id = 1, Model = "Airbus A320-200", TailNumber = "DEMO-A320-1", TotalSeats = 4, AirlineId = 1 };
@@ -36,8 +48,8 @@ public class GetFlightSeatMapQueryHandlerTests
             AircraftId = 1,
             Aircraft = aircraft,
             BasePrice = 100.00m,
-            DepartureTimeUtc = DateTime.UtcNow.AddDays(2),
-            ArrivalTimeUtc = DateTime.UtcNow.AddDays(2).AddHours(3),
+            DepartureTimeUtc = FixedUtcNow.UtcDateTime.AddDays(daysUntilDeparture),
+            ArrivalTimeUtc = FixedUtcNow.UtcDateTime.AddDays(daysUntilDeparture).AddHours(3),
             Status = FlightStatus.Scheduled
         };
 
@@ -55,7 +67,7 @@ public class GetFlightSeatMapQueryHandlerTests
         var flight = CreateFlightWithSeats(1);
         var fakeRepo = new FakeFlightRepository(flight);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new GetFlightSeatMapQueryHandler(fakeUow);
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
 
         // Act
         var result = await handler.Handle(new GetFlightSeatMapQuery(1), CancellationToken.None);
@@ -92,11 +104,32 @@ public class GetFlightSeatMapQueryHandlerTests
         // Arrange
         var fakeRepo = new FakeFlightRepository(null);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new GetFlightSeatMapQueryHandler(fakeUow);
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(new GetFlightSeatMapQuery(999), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_WithinLastMinuteWindow_DelegatesWindowAndAisleFeesToPricingService()
+    {
+        var flight = CreateFlightWithSeats(flightId: 1, daysUntilDeparture: 2);
+        var seat1A = flight.Aircraft!.Seats.Single(s => s.SeatNumber == "1A");
+        var seat1C = flight.Aircraft.Seats.Single(s => s.SeatNumber == "1C");
+        seat1A.IsWindow = true;
+        seat1C.IsAisle = true;
+
+        var fakeUow = new FakeUnitOfWork(new FakeFlightRepository(flight));
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
+
+        var result = await handler.Handle(new GetFlightSeatMapQuery(1), CancellationToken.None);
+
+        var seats = result.Data!.Rows.SelectMany(r => r.Seats).ToDictionary(s => s.SeatNumber);
+        // (100 * 2.0 + 10) * 1.20 = 252.00
+        Assert.Equal(252.00m, seats["1A"].Price);
+        // (100 * 2.0 + 5) * 1.20 = 246.00
+        Assert.Equal(246.00m, seats["1C"].Price);
     }
 
     #region Fakes

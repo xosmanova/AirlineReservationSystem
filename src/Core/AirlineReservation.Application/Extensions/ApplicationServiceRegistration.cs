@@ -7,6 +7,9 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
+using AirlineReservation.Application.Common.Models;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace AirlineReservation.Application.Extensions;
 
 /// <summary>
@@ -19,7 +22,9 @@ public static class ApplicationServiceRegistration
         var assembly = Assembly.GetExecutingAssembly();
 
         // Register default TimeProvider
-        services.AddSingleton(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton(new PricingSettings());
+        services.TryAddSingleton<IPricingService, PricingService>();
 
         // Register IBusinessTime for unified timezone-aware day boundary calculations
         services.AddSingleton<IBusinessTime, BusinessTimeService>();

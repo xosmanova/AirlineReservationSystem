@@ -1,4 +1,5 @@
 using AirlineReservation.Application.Common.Exceptions;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Seat;
@@ -14,10 +15,12 @@ namespace AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatM
 public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuery, ApiResponse<SeatMapDto>>
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPricingService _pricingService;
 
-    public GetFlightSeatMapQueryHandler(IUnitOfWork unitOfWork)
+    public GetFlightSeatMapQueryHandler(IUnitOfWork unitOfWork, IPricingService pricingService)
     {
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+        _pricingService = pricingService ?? throw new ArgumentNullException(nameof(pricingService));
     }
 
     public async Task<ApiResponse<SeatMapDto>> Handle(GetFlightSeatMapQuery request, CancellationToken cancellationToken)
@@ -47,7 +50,12 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
                 ColumnLetter = s.ColumnLetter,
                 SeatClass = s.SeatClass,
                 BasePriceMultiplier = s.BasePriceMultiplier,
-                Price = Math.Round(seatMapData.BasePrice * (s.BasePriceMultiplier > 0 ? s.BasePriceMultiplier : 1.0m), 2),
+                Price = _pricingService.CalculateSeatPrice(new SeatPricingInput(
+                    seatMapData.BasePrice,
+                    s.BasePriceMultiplier,
+                    s.IsWindow,
+                    s.IsAisle,
+                    seatMapData.DepartureTimeUtc)).FinalPrice,
                 Status = seatMapData.OccupiedSeatIds.Contains(s.Id) ? SeatStatus.Occupied : SeatStatus.Available,
                 HeldByMe = false,
                 IsWindow = s.IsWindow,
