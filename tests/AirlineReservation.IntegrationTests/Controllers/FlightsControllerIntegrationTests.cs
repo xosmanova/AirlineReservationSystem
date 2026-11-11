@@ -291,4 +291,101 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         Assert.Equal(1, seatMap.OccupiedSeatsCount);
         Assert.Equal(1, seatMap.AvailableSeatsCount);
     }
+
+    [Fact]
+    public async Task SeatMap_WidebodyBoeing777_Returns343Layout_WithoutColumnI_AndWithExactPricing()
+    {
+        int b777FlightId;
+        var row1Cols = new[] { "A", "B", "D", "G", "J", "K" };
+        var row10Cols = new[] { "A", "B", "C", "D", "E", "F", "G", "H", "J", "K" };
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var airlineId = await context.Airlines.Select(a => a.Id).FirstAsync();
+
+            var b777 = new Aircraft
+            {
+                Model = "Boeing 777-300ER",
+                TailNumber = "TEST-B77W-1",
+                TotalSeats = 16,
+                AirlineId = airlineId
+            };
+            context.Aircrafts.Add(b777);
+
+            foreach (var col in row1Cols)
+            {
+                context.Seats.Add(new Seat
+                {
+                    Aircraft = b777,
+                    SeatNumber = $"1{col}",
+                    RowNumber = 1,
+                    ColumnLetter = col,
+                    SeatClass = SeatClass.Business,
+                    BasePriceMultiplier = 2.0m,
+                    IsWindow = col is "A" or "K",
+                    IsAisle = col is "B" or "D" or "G" or "J"
+                });
+            }
+
+            foreach (var col in row10Cols)
+            {
+                context.Seats.Add(new Seat
+                {
+                    Aircraft = b777,
+                    SeatNumber = $"10{col}",
+                    RowNumber = 10,
+                    ColumnLetter = col,
+                    SeatClass = SeatClass.Economy,
+                    BasePriceMultiplier = 1.0m,
+                    IsWindow = col is "A" or "K",
+                    IsAisle = col is "C" or "D" or "G" or "H",
+                    IsExitRow = true
+                });
+            }
+
+            var flight = new Flight
+            {
+                FlightNumber = "J2-777",
+                AirlineId = airlineId,
+                Aircraft = b777,
+                DepartureAirportId = _factory.TestDepartureAirportId,
+                ArrivalAirportId = _factory.TestArrivalAirportId,
+                // +10 days from FixedTimeProvider (2026-11-10) -> standard demand window
+                DepartureTimeUtc = new DateTime(2026, 11, 20, 8, 0, 0, DateTimeKind.Utc),
+                ArrivalTimeUtc = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc),
+                BasePrice = 200.00m,
+                Stops = 0,
+                Status = FlightStatus.Scheduled
+            };
+            context.Flights.Add(flight);
+            await context.SaveChangesAsync();
+            b777FlightId = flight.Id;
+        }
+
+        var response = await _client.GetAsync($"/api/v1/flights/{b777FlightId}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var rawJson = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"status\":\"Available\"", rawJson);
+        Assert.Contains("\"seatClass\":\"Business\"", rawJson);
+        Assert.Contains("\"seatClass\":\"Economy\"", rawJson);
+        Assert.DoesNotContain("\"svgMap\"", rawJson, StringComparison.OrdinalIgnoreCase);
+
+        var seatMap = JsonSerializer.Deserialize<ApiResponse<SeatMapDto>>(rawJson, JsonOptions)!.Data!;
+        Assert.Equal(16, seatMap.TotalSeats);
+
+        var allColumns = seatMap.Rows.SelectMany(r => r.Seats).Select(s => s.ColumnLetter).Distinct().ToList();
+        Assert.DoesNotContain("I", allColumns);
+
+        var row10 = Assert.Single(seatMap.Rows, r => r.RowNumber == 10);
+        Assert.Equal(10, row10.Seats.Count);
+        Assert.Equal(row10Cols, row10.Seats.Select(s => s.ColumnLetter).ToArray());
+
+        var allSeats = seatMap.Rows.SelectMany(r => r.Seats).ToDictionary(s => s.SeatNumber);
+        Assert.Equal(410.00m, allSeats["1A"].Price);  // 200 * 2.0 + 10
+        Assert.Equal(210.00m, allSeats["10A"].Price); // 200 * 1.0 + 10
+        Assert.Equal(205.00m, allSeats["10C"].Price); // 200 * 1.0 + 5
+        Assert.Equal(200.00m, allSeats["10B"].Price); // 200 * 1.0 + 0
+    }
 }
