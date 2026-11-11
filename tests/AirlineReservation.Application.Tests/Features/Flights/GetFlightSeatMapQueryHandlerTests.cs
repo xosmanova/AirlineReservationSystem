@@ -1,11 +1,12 @@
-using AirlineReservation.Application.DTOs.Flight;
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Contracts.Persistence;
+using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
 using AirlineReservation.Domain.Common;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Domain.Specifications;
 using Xunit;
 
 namespace AirlineReservation.Application.Tests.Features.Flights;
@@ -133,6 +134,47 @@ public class GetFlightSeatMapQueryHandlerTests
 
         public Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default)
             => Task.FromResult(_flight?.Id == flightId ? _flight : null);
+
+        public Task<FlightSeatMapData?> GetFlightSeatMapDataAsync(int flightId, CancellationToken cancellationToken = default)
+        {
+            if (_flight == null || _flight.Id != flightId)
+            {
+                return Task.FromResult<FlightSeatMapData?>(null);
+            }
+
+            var seats = (_flight.Aircraft?.Seats ?? [])
+                .OrderBy(s => s.RowNumber)
+                .ThenBy(s => s.ColumnLetter)
+                .Select(s => new SeatMapSeatItem(
+                    s.Id,
+                    s.AircraftId,
+                    s.SeatNumber,
+                    s.RowNumber,
+                    s.ColumnLetter,
+                    s.SeatClass,
+                    s.BasePriceMultiplier,
+                    s.IsWindow,
+                    s.IsAisle,
+                    s.IsExitRow))
+                .ToList();
+
+            var occupied = _flight.Tickets
+                .Where(TicketSpecifications.IsActiveCompiled)
+                .Select(t => t.SeatId)
+                .ToHashSet();
+
+            return Task.FromResult<FlightSeatMapData?>(new FlightSeatMapData(
+                _flight.Id,
+                _flight.FlightNumber,
+                _flight.Airline?.Name ?? string.Empty,
+                _flight.AircraftId,
+                _flight.Aircraft?.Model ?? string.Empty,
+                _flight.BasePrice,
+                _flight.DepartureTimeUtc,
+                _flight.Status,
+                seats,
+                occupied));
+        }
 
         public Task<(IReadOnlyList<FlightDto> Items, int TotalCount)> SearchFlightsAsync(int d, int a, DateTime st, DateTime en, DateTime now, int pc = 1, decimal? minP = null, decimal? maxP = null, int? al = null, int? stp = null, string? sb = null, string? sd = null, int p = 1, int ps = 10, CancellationToken ct = default)
             => Task.FromResult<(IReadOnlyList<FlightDto> Items, int TotalCount)>(([], 0));

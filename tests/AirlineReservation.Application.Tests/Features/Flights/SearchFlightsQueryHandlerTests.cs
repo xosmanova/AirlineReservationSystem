@@ -294,6 +294,9 @@ public class SearchFlightsQueryHandlerTests
             return Task.FromResult(flight);
         }
 
+        public Task<FlightSeatMapData?> GetFlightSeatMapDataAsync(int flightId, CancellationToken cancellationToken = default)
+            => Task.FromResult<FlightSeatMapData?>(null);
+
         public Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Flight>>(_flights.Take(count).ToList());
 

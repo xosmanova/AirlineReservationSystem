@@ -8,8 +8,12 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Flight;
+using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.IntegrationTests.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace AirlineReservation.IntegrationTests.Controllers;
@@ -213,5 +217,78 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         Assert.Equal("image/svg+xml", svgResp.Content.Headers.ContentType?.MediaType);
         string svg = await svgResp.Content.ReadAsStringAsync();
         Assert.StartsWith("<svg", svg);
+    }
+
+    [Fact]
+    public async Task SeatMap_ProjectionQuery_ExcludesCancelledTicketsAndCancelledBookings_InSql()
+    {
+        int flight1Id = _factory.TestFlight1Id;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var ownerUserId = await context.Users.Select(u => u.Id).FirstAsync();
+            var seat1B = await context.Seats.FirstAsync(s => s.SeatNumber == "1B");
+            var passengerId = await context.Passengers.Select(p => p.Id).FirstAsync();
+
+            var cancelledBooking = new Booking
+            {
+                UserId = ownerUserId,
+                PnrCode = "CNCL01",
+                ContactEmail = "cancel@airline.test",
+                ContactPhone = "+994501112233",
+                Status = BookingStatus.Cancelled,
+                TotalAmount = 150m
+            };
+            context.Bookings.Add(cancelledBooking);
+
+            var confirmedBooking = new Booking
+            {
+                UserId = ownerUserId,
+                PnrCode = "CONF02",
+                ContactEmail = "conf@airline.test",
+                ContactPhone = "+994501112244",
+                Status = BookingStatus.Confirmed,
+                TotalAmount = 150m
+            };
+            context.Bookings.Add(confirmedBooking);
+            await context.SaveChangesAsync();
+
+            // Ticket from a Cancelled booking + Cancelled ticket from a Confirmed booking on Seat 1B
+            context.Tickets.AddRange(
+                new Ticket
+                {
+                    TicketNumber = "ET-CNCL-001",
+                    FlightId = flight1Id,
+                    BookingId = cancelledBooking.Id,
+                    PassengerId = passengerId,
+                    SeatId = seat1B.Id,
+                    Price = 150m,
+                    IsCancelled = false
+                },
+                new Ticket
+                {
+                    TicketNumber = "ET-CNCL-002",
+                    FlightId = flight1Id,
+                    BookingId = confirmedBooking.Id,
+                    PassengerId = passengerId,
+                    SeatId = seat1B.Id,
+                    Price = 150m,
+                    IsCancelled = true
+                });
+            await context.SaveChangesAsync();
+        }
+
+        var response = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var seatMap = (await response.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>(JsonOptions))!.Data!;
+        var seat1A = seatMap.Rows.SelectMany(r => r.Seats).Single(s => s.SeatNumber == "1A");
+        var seat1BResult = seatMap.Rows.SelectMany(r => r.Seats).Single(s => s.SeatNumber == "1B");
+
+        Assert.Equal(SeatStatus.Occupied, seat1A.Status);
+        Assert.Equal(SeatStatus.Available, seat1BResult.Status);
+        Assert.Equal(1, seatMap.OccupiedSeatsCount);
+        Assert.Equal(1, seatMap.AvailableSeatsCount);
     }
 }
