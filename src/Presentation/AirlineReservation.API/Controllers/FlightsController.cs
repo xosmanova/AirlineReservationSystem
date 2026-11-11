@@ -1,4 +1,5 @@
-﻿using AirlineReservation.Application.Common.Models;
+﻿using AirlineReservation.Application.Common.Generators;
+using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.DTOs.Seat;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightById;
@@ -42,10 +43,10 @@ public class FlightsController : BaseApiController
     }
 
     /// <summary>
-    /// Retrieves interactive aircraft cabin seat map with real-time seat occupancy and dynamic pricing.
+    /// Retrieves structured aircraft cabin seat map with real-time seat statuses and dynamic pricing.
     /// </summary>
     /// <param name="id">Unique identifier of the flight.</param>
-    /// <returns>Standardized ApiResponse containing structured seat map rows and embedded SVG markup.</returns>
+    /// <returns>Standardized ApiResponse containing structured seat map rows.</returns>
     [HttpGet("{id:int}/seatmap")]
     [ProducesResponseType(typeof(ApiResponse<SeatMapDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -56,7 +57,7 @@ public class FlightsController : BaseApiController
     }
 
     /// <summary>
-    /// Renders standalone, interactive SVG aircraft cabin map for direct browser display or iframe embedding.
+    /// Renders standalone SVG aircraft cabin map for direct browser display or iframe embedding.
     /// </summary>
     /// <param name="id">Unique identifier of the flight.</param>
     /// <returns>Raw SVG XML content with image/svg+xml MIME type.</returns>
@@ -72,6 +73,12 @@ public class FlightsController : BaseApiController
             return NotFound(result);
         }
 
-        return Content(result.Data.SvgMap, "image/svg+xml", System.Text.Encoding.UTF8);
+        string svgMap = SvgSeatMapGenerator.Generate(
+            result.Data.FlightNumber,
+            result.Data.AirlineName,
+            result.Data.AircraftModel,
+            result.Data.Rows);
+
+        return Content(svgMap, "image/svg+xml", System.Text.Encoding.UTF8);
     }
 }

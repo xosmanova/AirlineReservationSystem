@@ -1,7 +1,7 @@
 namespace AirlineReservation.Application.DTOs.Seat;
 
 /// <summary>
-/// Comprehensive flight seat map data transfer object containing structured rows and SVG markup.
+/// Comprehensive flight seat map data transfer object containing structured cabin rows.
 /// </summary>
 public class SeatMapDto
 {
@@ -14,5 +14,4 @@ public class SeatMapDto
     public int OccupiedSeatsCount { get; set; }
     public decimal BasePrice { get; set; }
     public IReadOnlyList<SeatRowDto> Rows { get; set; } = [];
-    public string SvgMap { get; set; } = string.Empty;
 }

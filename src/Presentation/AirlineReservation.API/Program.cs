@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using AirlineReservation.API.Extensions;
 using AirlineReservation.API.Middlewares;
 using AirlineReservation.Application.Common.Helpers;
@@ -14,7 +15,11 @@ var configuredTimeZone = builder.Configuration["Business:TimeZone"] ?? "Asia/Bak
 TimeZoneHelper.GetRequiredTimeZone(configuredTimeZone);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // Configure CORS for Client Web App
 builder.Services.AddCors(options =>

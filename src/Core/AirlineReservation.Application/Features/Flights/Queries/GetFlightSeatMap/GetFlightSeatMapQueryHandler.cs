@@ -1,17 +1,16 @@
-using AirlineReservation.Domain.Specifications;
 using AirlineReservation.Application.Common.Exceptions;
-using AirlineReservation.Application.Common.Generators;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Seat;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Domain.Specifications;
 using MediatR;
 
 namespace AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
 
 /// <summary>
-/// CQRS Query Handler for generating interactive aircraft cabin seat maps with real-time occupancy.
+/// CQRS Query Handler for generating interactive aircraft cabin seat maps with real-time seat statuses.
 /// </summary>
 public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuery, ApiResponse<SeatMapDto>>
 {
@@ -41,20 +40,23 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             .Select(t => t.SeatId)
             .ToHashSet();
 
-        // Project all seats with accurate seat-class multipliers and occupancy
-        var flightSeats = flight.Aircraft.Seats
+        // Project all seats with accurate seat-class multipliers and availability status.
+        // Held/HeldByMe become active in Day 14 (SeatHold) and Blocked in Day 31 (FlightSeatBlock).
+        var seats = flight.Aircraft.Seats
             .OrderBy(s => s.RowNumber)
             .ThenBy(s => s.ColumnLetter)
-            .Select(s => new FlightSeatDto
+            .Select(s => new SeatDto
             {
                 Id = s.Id,
+                AircraftId = s.AircraftId,
                 SeatNumber = s.SeatNumber,
                 RowNumber = s.RowNumber,
                 ColumnLetter = s.ColumnLetter,
                 SeatClass = s.SeatClass,
                 BasePriceMultiplier = s.BasePriceMultiplier,
                 Price = Math.Round(flight.BasePrice * (s.BasePriceMultiplier > 0 ? s.BasePriceMultiplier : 1.0m), 2),
-                IsOccupied = occupiedSeatIds.Contains(s.Id),
+                Status = occupiedSeatIds.Contains(s.Id) ? SeatStatus.Occupied : SeatStatus.Available,
+                HeldByMe = false,
                 IsWindow = s.IsWindow,
                 IsAisle = s.IsAisle,
                 IsExitRow = s.IsExitRow
@@ -62,7 +64,7 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             .ToList();
 
         // Group into cabin rows
-        var rows = flightSeats
+        var rows = seats
             .GroupBy(s => s.RowNumber)
             .OrderBy(g => g.Key)
             .Select(g => new SeatRowDto
@@ -74,15 +76,8 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             })
             .ToList();
 
-        // Generate dynamic interactive SVG seat map
-        string svgMap = SvgSeatMapGenerator.Generate(
-            flight.FlightNumber,
-            flight.Airline?.Name ?? "Airline",
-            flight.Aircraft.Model,
-            rows);
-
-        int totalSeats = flightSeats.Count;
-        int occupiedCount = flightSeats.Count(s => s.IsOccupied);
+        int totalSeats = seats.Count;
+        int occupiedCount = seats.Count(s => s.Status != SeatStatus.Available);
         int availableCount = Math.Max(0, totalSeats - occupiedCount);
 
         var dto = new SeatMapDto
@@ -95,8 +90,7 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             AvailableSeatsCount = availableCount,
             OccupiedSeatsCount = occupiedCount,
             BasePrice = flight.BasePrice,
-            Rows = rows,
-            SvgMap = svgMap
+            Rows = rows
         };
 
         return ApiResponse<SeatMapDto>.SuccessResult(

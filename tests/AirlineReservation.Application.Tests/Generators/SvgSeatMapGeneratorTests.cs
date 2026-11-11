@@ -19,10 +19,10 @@ public class SvgSeatMapGeneratorTests
             IsExitRow = false,
             Seats =
             [
-                new() { Id = 1, SeatNumber = "1A", RowNumber = 1, ColumnLetter = "A", SeatClass = SeatClass.Business, Price = 360m, IsOccupied = false },
-                new() { Id = 2, SeatNumber = "1C", RowNumber = 1, ColumnLetter = "C", SeatClass = SeatClass.Business, Price = 360m, IsOccupied = true },
-                new() { Id = 3, SeatNumber = "1D", RowNumber = 1, ColumnLetter = "D", SeatClass = SeatClass.Business, Price = 360m, IsOccupied = false },
-                new() { Id = 4, SeatNumber = "1F", RowNumber = 1, ColumnLetter = "F", SeatClass = SeatClass.Business, Price = 360m, IsOccupied = false }
+                new() { Id = 1, SeatNumber = "1A", RowNumber = 1, ColumnLetter = "A", SeatClass = SeatClass.Business, Price = 360m, Status = SeatStatus.Available },
+                new() { Id = 2, SeatNumber = "1C", RowNumber = 1, ColumnLetter = "C", SeatClass = SeatClass.Business, Price = 360m, Status = SeatStatus.Occupied },
+                new() { Id = 3, SeatNumber = "1D", RowNumber = 1, ColumnLetter = "D", SeatClass = SeatClass.Business, Price = 360m, Status = SeatStatus.Available },
+                new() { Id = 4, SeatNumber = "1F", RowNumber = 1, ColumnLetter = "F", SeatClass = SeatClass.Business, Price = 360m, Status = SeatStatus.Available }
             ]
         });
 
@@ -34,12 +34,12 @@ public class SvgSeatMapGeneratorTests
             IsExitRow = true,
             Seats =
             [
-                new() { Id = 10, SeatNumber = "12A", RowNumber = 12, ColumnLetter = "A", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = false, IsExitRow = true },
-                new() { Id = 11, SeatNumber = "12B", RowNumber = 12, ColumnLetter = "B", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = false, IsExitRow = true },
-                new() { Id = 12, SeatNumber = "12C", RowNumber = 12, ColumnLetter = "C", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = true, IsExitRow = true },
-                new() { Id = 13, SeatNumber = "12D", RowNumber = 12, ColumnLetter = "D", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = false, IsExitRow = true },
-                new() { Id = 14, SeatNumber = "12E", RowNumber = 12, ColumnLetter = "E", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = false, IsExitRow = true },
-                new() { Id = 15, SeatNumber = "12F", RowNumber = 12, ColumnLetter = "F", SeatClass = SeatClass.Economy, Price = 180m, IsOccupied = false, IsExitRow = true }
+                new() { Id = 10, SeatNumber = "12A", RowNumber = 12, ColumnLetter = "A", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Available, IsExitRow = true },
+                new() { Id = 11, SeatNumber = "12B", RowNumber = 12, ColumnLetter = "B", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Available, IsExitRow = true },
+                new() { Id = 12, SeatNumber = "12C", RowNumber = 12, ColumnLetter = "C", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Occupied, IsExitRow = true },
+                new() { Id = 13, SeatNumber = "12D", RowNumber = 12, ColumnLetter = "D", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Available, IsExitRow = true },
+                new() { Id = 14, SeatNumber = "12E", RowNumber = 12, ColumnLetter = "E", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Available, IsExitRow = true },
+                new() { Id = 15, SeatNumber = "12F", RowNumber = 12, ColumnLetter = "F", SeatClass = SeatClass.Economy, Price = 180m, Status = SeatStatus.Available, IsExitRow = true }
             ]
         });
 
@@ -58,16 +58,16 @@ public class SvgSeatMapGeneratorTests
             IsExitRow = false,
             Seats =
             [
-                new() { Id = 20, SeatNumber = "5A", RowNumber = 5, ColumnLetter = "A", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 21, SeatNumber = "5B", RowNumber = 5, ColumnLetter = "B", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 22, SeatNumber = "5C", RowNumber = 5, ColumnLetter = "C", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 23, SeatNumber = "5D", RowNumber = 5, ColumnLetter = "D", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 24, SeatNumber = "5E", RowNumber = 5, ColumnLetter = "E", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 25, SeatNumber = "5F", RowNumber = 5, ColumnLetter = "F", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 26, SeatNumber = "5G", RowNumber = 5, ColumnLetter = "G", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 27, SeatNumber = "5H", RowNumber = 5, ColumnLetter = "H", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 28, SeatNumber = "5J", RowNumber = 5, ColumnLetter = "J", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false },
-                new() { Id = 29, SeatNumber = "5K", RowNumber = 5, ColumnLetter = "K", SeatClass = SeatClass.Economy, Price = 250m, IsOccupied = false }
+                new() { Id = 20, SeatNumber = "5A", RowNumber = 5, ColumnLetter = "A", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 21, SeatNumber = "5B", RowNumber = 5, ColumnLetter = "B", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 22, SeatNumber = "5C", RowNumber = 5, ColumnLetter = "C", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 23, SeatNumber = "5D", RowNumber = 5, ColumnLetter = "D", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 24, SeatNumber = "5E", RowNumber = 5, ColumnLetter = "E", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 25, SeatNumber = "5F", RowNumber = 5, ColumnLetter = "F", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 26, SeatNumber = "5G", RowNumber = 5, ColumnLetter = "G", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 27, SeatNumber = "5H", RowNumber = 5, ColumnLetter = "H", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 28, SeatNumber = "5J", RowNumber = 5, ColumnLetter = "J", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available },
+                new() { Id = 29, SeatNumber = "5K", RowNumber = 5, ColumnLetter = "K", SeatClass = SeatClass.Economy, Price = 250m, Status = SeatStatus.Available }
             ]
         });
 

@@ -1,5 +1,7 @@
 using AirlineReservation.Application.DTOs.Seat;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Net;
 using System.Net.Http.Json;
@@ -16,6 +18,10 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public FlightsControllerIntegrationTests(CustomWebApplicationFactory factory)
     {
@@ -44,7 +50,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=2&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response2p.StatusCode);
-        var result2p = await response2p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result2p = await response2p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result2p);
         Assert.NotNull(result2p.Data);
 
@@ -56,7 +62,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response1p.StatusCode);
-        var result1p = await response1p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result1p = await response1p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result1p);
         Assert.NotNull(result1p.Data);
 
@@ -77,7 +83,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=1&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage1.StatusCode);
-        var page1 = await resPage1.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page1 = await resPage1.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page1?.Data);
         Assert.Equal(14, page1.Data.TotalCount);
         Assert.Equal(5, page1.Data.Items.Count);
@@ -91,7 +97,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=2&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage2.StatusCode);
-        var page2 = await resPage2.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page2 = await resPage2.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page2?.Data);
         Assert.Equal(14, page2.Data.TotalCount);
         Assert.Equal(5, page2.Data.Items.Count);
@@ -104,7 +110,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=3&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage3.StatusCode);
-        var page3 = await resPage3.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page3 = await resPage3.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page3?.Data);
         Assert.Equal(14, page3.Data.TotalCount);
         Assert.Equal(4, page3.Data.Items.Count);
@@ -125,7 +131,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result?.Data);
 
         var delayedFlight = Assert.Single(result.Data.Items, f => f.Id == delayedFlightId);
@@ -144,7 +150,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result?.Data);
 
         Assert.DoesNotContain(result.Data.Items, f => f.Id == cancelledFlightId);
@@ -161,18 +167,51 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         var searchResp = await _client.GetAsync(
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
         Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
-        var searchResult = await searchResp.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var searchResult = await searchResp.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         var flightInSearch = Assert.Single(searchResult!.Data!.Items, f => f.Id == flight1Id);
 
         // 2. SeatMap endpoint
         var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
         Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
-        var seatMapResult = await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>();
+        var seatMapResult = await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>(JsonOptions);
         Assert.NotNull(seatMapResult?.Data);
 
         // 3. Exact equality between search and seat map
         Assert.Equal(flightInSearch.AvailableSeatsCount, seatMapResult.Data.AvailableSeatsCount);
-        int countedFreeSeatsInRows = seatMapResult.Data.Rows.SelectMany(r => r.Seats).Count(s => !s.IsOccupied);
+        int countedFreeSeatsInRows = seatMapResult.Data.Rows.SelectMany(r => r.Seats).Count(s => s.Status == SeatStatus.Available);
         Assert.Equal(flightInSearch.AvailableSeatsCount, countedFreeSeatsInRows);
+    }
+
+    [Fact]
+    public async Task SeatMap_And_FlightSearch_SerializeEnumsAsStrings_AndOmitSvgMap()
+    {
+        int depId = _factory.TestDepartureAirportId;
+        int arrId = _factory.TestArrivalAirportId;
+        int flight1Id = _factory.TestFlight1Id;
+
+        var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
+        string seatMapJson = await seatMapResp.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"status\":\"Available\"", seatMapJson);
+        Assert.Contains("\"status\":\"Occupied\"", seatMapJson);
+        Assert.Contains("\"seatClass\":\"Economy\"", seatMapJson);
+        Assert.Contains("\"heldByMe\":false", seatMapJson);
+        Assert.DoesNotContain("\"svgMap\"", seatMapJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"isOccupied\"", seatMapJson, StringComparison.OrdinalIgnoreCase);
+
+        var searchResp = await _client.GetAsync(
+            $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
+        Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
+        string searchJson = await searchResp.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"status\":\"Scheduled\"", searchJson);
+        Assert.Contains("\"status\":\"Delayed\"", searchJson);
+
+        var svgResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap/svg");
+        Assert.Equal(HttpStatusCode.OK, svgResp.StatusCode);
+        Assert.Equal("image/svg+xml", svgResp.Content.Headers.ContentType?.MediaType);
+        string svg = await svgResp.Content.ReadAsStringAsync();
+        Assert.StartsWith("<svg", svg);
     }
 }

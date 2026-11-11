@@ -70,17 +70,19 @@ public class GetFlightSeatMapQueryHandlerTests
 
         // Check seat 1A (available, 100 * 2.0 = 200)
         var seat1A = result.Data.Rows[0].Seats.First(s => s.SeatNumber == "1A");
-        Assert.False(seat1A.IsOccupied);
+        Assert.Equal(SeatStatus.Available, seat1A.Status);
+        Assert.False(seat1A.HeldByMe);
         Assert.Equal(200.00m, seat1A.Price);
 
         // Check seat 1C (occupied)
         var seat1C = result.Data.Rows[0].Seats.First(s => s.SeatNumber == "1C");
-        Assert.True(seat1C.IsOccupied);
+        Assert.Equal(SeatStatus.Occupied, seat1C.Status);
+        Assert.False(seat1C.HeldByMe);
 
-        // Check SVG was generated
-        Assert.NotNull(result.Data.SvgMap);
-        Assert.Contains("<svg", result.Data.SvgMap);
-        Assert.Contains("data-seat-number=\"1A\"", result.Data.SvgMap);
+        // Contract assertions: SvgMap and FlightSeatDto/IsOccupied must be absent
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatMapDto).GetProperty("SvgMap"));
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatDto).GetProperty("IsOccupied"));
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatMapDto).Assembly.GetType("AirlineReservation.Application.DTOs.Seat.FlightSeatDto"));
     }
 
     [Fact]
