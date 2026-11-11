@@ -27,6 +27,8 @@ public interface IFlightRepository : IGenericRepository<Flight>
 
     Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default);
 
+    Task<FlightSeatMapData?> GetFlightSeatMapDataAsync(int flightId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Flight>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default);

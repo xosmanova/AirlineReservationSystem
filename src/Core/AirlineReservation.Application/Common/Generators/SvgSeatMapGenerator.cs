@@ -301,15 +301,16 @@ public static class SvgSeatMapGenerator
 
     private static void RenderSingleSeat(
         StringBuilder sb,
-        FlightSeatDto seat,
+        SeatDto seat,
         int x,
         int y,
         int width,
         int height)
     {
-        string statusClass = seat.IsOccupied ? "occupied" : "available";
+        bool isUnavailable = seat.Status != SeatStatus.Available;
+        string statusClass = isUnavailable ? seat.Status.ToString().ToLowerInvariant() : "available";
         string classModifier = seat.SeatClass == SeatClass.Business ? "business" : "economy";
-        string ariaDisabled = seat.IsOccupied ? @"aria-disabled=""true""" : @"role=""button"" tabindex=""0""";
+        string ariaDisabled = isUnavailable ? @"aria-disabled=""true""" : @"role=""button"" tabindex=""0""";
 
         sb.Append($@"    <g class=""seat {classModifier} {statusClass}"" ")
           .Append($@"id=""seat-{seat.Id}"" ")
@@ -323,9 +324,9 @@ public static class SvgSeatMapGenerator
           .Append($@"{ariaDisabled}>");
 
         // Native SVG Accessible Tooltip
-        string tooltipText = seat.IsOccupied
-            ? $"Seat {seat.SeatNumber} - Occupied"
-            : $"Seat {seat.SeatNumber} ({seat.SeatClass}) - ${seat.Price:F2}";
+        string tooltipText = isUnavailable
+            ? $"Seat {seat.SeatNumber} - {seat.Status}"
+            : $"Seat {seat.SeatNumber} ({seat.SeatClass}) - {seat.Price:F2} AZN";
         sb.Append($@"<title>{tooltipText}</title>");
 
         // Seat Main Body
@@ -335,7 +336,7 @@ public static class SvgSeatMapGenerator
         int headrestHeight = (int)(height * 0.28);
         sb.Append($@"<rect x=""{x + 3}"" y=""{y + 3}"" width=""{width - 6}"" height=""{headrestHeight}"" class=""seat-headrest"" />");
 
-        if (seat.IsOccupied)
+        if (isUnavailable)
         {
             // Occupied Diagonal Lock Strike
             sb.Append($@"<line x1=""{x + 5}"" y1=""{y + 5}"" x2=""{x + width - 5}"" y2=""{y + height - 5}"" />");

@@ -1,18 +1,31 @@
-using AirlineReservation.Application.DTOs.Flight;
 using System.Linq.Expressions;
 using AirlineReservation.Application.Common.Exceptions;
+using AirlineReservation.Application.Common.Models;
+using AirlineReservation.Application.Common.Services;
 using AirlineReservation.Application.Contracts.Persistence;
+using AirlineReservation.Application.DTOs.Flight;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
 using AirlineReservation.Domain.Common;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Domain.Specifications;
 using Xunit;
 
 namespace AirlineReservation.Application.Tests.Features.Flights;
 
 public class GetFlightSeatMapQueryHandlerTests
 {
-    private static Flight CreateFlightWithSeats(int flightId = 1)
+    private static readonly DateTimeOffset FixedUtcNow = new(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+
+    private sealed class FakeClock(DateTimeOffset utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+
+    private static PricingService CreatePricingService()
+        => new(new PricingSettings(), new FakeClock(FixedUtcNow));
+
+    private static Flight CreateFlightWithSeats(int flightId = 1, int daysUntilDeparture = 10)
     {
         var azal = new Airline { Id = 1, Code = "J2", Name = "Azerbaijan Airlines (AZAL)" };
         var aircraft = new Aircraft { Id = 1, Model = "Airbus A320-200", TailNumber = "DEMO-A320-1", TotalSeats = 4, AirlineId = 1 };
@@ -35,8 +48,8 @@ public class GetFlightSeatMapQueryHandlerTests
             AircraftId = 1,
             Aircraft = aircraft,
             BasePrice = 100.00m,
-            DepartureTimeUtc = DateTime.UtcNow.AddDays(2),
-            ArrivalTimeUtc = DateTime.UtcNow.AddDays(2).AddHours(3),
+            DepartureTimeUtc = FixedUtcNow.UtcDateTime.AddDays(daysUntilDeparture),
+            ArrivalTimeUtc = FixedUtcNow.UtcDateTime.AddDays(daysUntilDeparture).AddHours(3),
             Status = FlightStatus.Scheduled
         };
 
@@ -54,7 +67,7 @@ public class GetFlightSeatMapQueryHandlerTests
         var flight = CreateFlightWithSeats(1);
         var fakeRepo = new FakeFlightRepository(flight);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new GetFlightSeatMapQueryHandler(fakeUow);
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
 
         // Act
         var result = await handler.Handle(new GetFlightSeatMapQuery(1), CancellationToken.None);
@@ -70,17 +83,19 @@ public class GetFlightSeatMapQueryHandlerTests
 
         // Check seat 1A (available, 100 * 2.0 = 200)
         var seat1A = result.Data.Rows[0].Seats.First(s => s.SeatNumber == "1A");
-        Assert.False(seat1A.IsOccupied);
+        Assert.Equal(SeatStatus.Available, seat1A.Status);
+        Assert.False(seat1A.HeldByMe);
         Assert.Equal(200.00m, seat1A.Price);
 
         // Check seat 1C (occupied)
         var seat1C = result.Data.Rows[0].Seats.First(s => s.SeatNumber == "1C");
-        Assert.True(seat1C.IsOccupied);
+        Assert.Equal(SeatStatus.Occupied, seat1C.Status);
+        Assert.False(seat1C.HeldByMe);
 
-        // Check SVG was generated
-        Assert.NotNull(result.Data.SvgMap);
-        Assert.Contains("<svg", result.Data.SvgMap);
-        Assert.Contains("data-seat-number=\"1A\"", result.Data.SvgMap);
+        // Contract assertions: SvgMap and FlightSeatDto/IsOccupied must be absent
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatMapDto).GetProperty("SvgMap"));
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatDto).GetProperty("IsOccupied"));
+        Assert.Null(typeof(AirlineReservation.Application.DTOs.Seat.SeatMapDto).Assembly.GetType("AirlineReservation.Application.DTOs.Seat.FlightSeatDto"));
     }
 
     [Fact]
@@ -89,11 +104,32 @@ public class GetFlightSeatMapQueryHandlerTests
         // Arrange
         var fakeRepo = new FakeFlightRepository(null);
         var fakeUow = new FakeUnitOfWork(fakeRepo);
-        var handler = new GetFlightSeatMapQueryHandler(fakeUow);
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(new GetFlightSeatMapQuery(999), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_WithinLastMinuteWindow_DelegatesWindowAndAisleFeesToPricingService()
+    {
+        var flight = CreateFlightWithSeats(flightId: 1, daysUntilDeparture: 2);
+        var seat1A = flight.Aircraft!.Seats.Single(s => s.SeatNumber == "1A");
+        var seat1C = flight.Aircraft.Seats.Single(s => s.SeatNumber == "1C");
+        seat1A.IsWindow = true;
+        seat1C.IsAisle = true;
+
+        var fakeUow = new FakeUnitOfWork(new FakeFlightRepository(flight));
+        var handler = new GetFlightSeatMapQueryHandler(fakeUow, CreatePricingService());
+
+        var result = await handler.Handle(new GetFlightSeatMapQuery(1), CancellationToken.None);
+
+        var seats = result.Data!.Rows.SelectMany(r => r.Seats).ToDictionary(s => s.SeatNumber);
+        // (100 * 2.0 + 10) * 1.20 = 252.00
+        Assert.Equal(252.00m, seats["1A"].Price);
+        // (100 * 2.0 + 5) * 1.20 = 246.00
+        Assert.Equal(246.00m, seats["1C"].Price);
     }
 
     #region Fakes
@@ -131,6 +167,47 @@ public class GetFlightSeatMapQueryHandlerTests
 
         public Task<Flight?> GetFlightWithDetailsAsync(int flightId, CancellationToken cancellationToken = default)
             => Task.FromResult(_flight?.Id == flightId ? _flight : null);
+
+        public Task<FlightSeatMapData?> GetFlightSeatMapDataAsync(int flightId, CancellationToken cancellationToken = default)
+        {
+            if (_flight == null || _flight.Id != flightId)
+            {
+                return Task.FromResult<FlightSeatMapData?>(null);
+            }
+
+            var seats = (_flight.Aircraft?.Seats ?? [])
+                .OrderBy(s => s.RowNumber)
+                .ThenBy(s => s.ColumnLetter)
+                .Select(s => new SeatMapSeatItem(
+                    s.Id,
+                    s.AircraftId,
+                    s.SeatNumber,
+                    s.RowNumber,
+                    s.ColumnLetter,
+                    s.SeatClass,
+                    s.BasePriceMultiplier,
+                    s.IsWindow,
+                    s.IsAisle,
+                    s.IsExitRow))
+                .ToList();
+
+            var occupied = _flight.Tickets
+                .Where(TicketSpecifications.IsActiveCompiled)
+                .Select(t => t.SeatId)
+                .ToHashSet();
+
+            return Task.FromResult<FlightSeatMapData?>(new FlightSeatMapData(
+                _flight.Id,
+                _flight.FlightNumber,
+                _flight.Airline?.Name ?? string.Empty,
+                _flight.AircraftId,
+                _flight.Aircraft?.Model ?? string.Empty,
+                _flight.BasePrice,
+                _flight.DepartureTimeUtc,
+                _flight.Status,
+                seats,
+                occupied));
+        }
 
         public Task<(IReadOnlyList<FlightDto> Items, int TotalCount)> SearchFlightsAsync(int d, int a, DateTime st, DateTime en, DateTime now, int pc = 1, decimal? minP = null, decimal? maxP = null, int? al = null, int? stp = null, string? sb = null, string? sd = null, int p = 1, int ps = 10, CancellationToken ct = default)
             => Task.FromResult<(IReadOnlyList<FlightDto> Items, int TotalCount)>(([], 0));

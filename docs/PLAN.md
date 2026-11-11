@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Cari vəziyyət (Gün 1-12: TAMAMLANDI)
+## 1. Cari vəziyyət (Gün 1-13: TAMAMLANDI)
 
 - Solution `AirlineReservationSystem.slnx`, layihələr: `Domain`, `Application`, `Infrastructure`, `API`, `Admin` (MVC), `Client` (statik HTML/CSS/JS). Admin heç bir daxili qata istinad etmir.
 - Application: CQRS (**MediatR 12.5.0**, Apache 2.0), `ApiResponse<T>` zərfi, FluentValidation + `ValidationBehavior`, **Riok.Mapperly**, xüsusi exception-lar, `GlobalExceptionHandlerMiddleware`, `TimeProvider`.
@@ -17,7 +17,7 @@
 - **Gün 10 (TAMAMLANDI):** `ThenBy(f => f.Id)` tie-break, `TicketSpecifications` vahid aktiv bilet qaydası, `Airport.Aliases` + miqrasiya + seed, aviaşirkət adları yeniləndi, `GET /api/v1/airports?search=` və `GET /api/v1/airlines` endpoint-ləri + unit və inteqrasiya testləri (`36f4648`).
 - **Gün 11 (TAMAMLANDI):** ASP.NET Core Identity (`AppUser`, `AppRole` yalnız Infrastructure-da), `admin@airline.test` `user-secrets`-dən seed (`EmailConfirmed = true`), test fabriki `user-secrets`-dən təcrid edildi + `_Test` qoruyucusu + `FixedTimeProvider`, `Booking.UserId` məcburi `Guid` + `Restrict` FK (`MakeBookingUserRequired`), 97 test (74 unit + 23 inteqrasiya) yaşıl.
 - **Gün 12 (TAMAMLANDI):** Stateless JWT Bearer auth (`AddIdentityCore` — cookie sxemi yoxdur, tokensiz `401`), `ITokenService` / `JwtTokenService` (`Jwt:Key` `user-secrets`-dən, `TimeProvider` sinxron `LifetimeValidator`), `AuthController` (`register`, `login`, `me`, `admin-check`), Scalar Bearer "Authorize", login-only `AddRateLimiter`, 133 test (96 unit + 37 inteqrasiya) yaşıl.
-- Köhnə plana görə **erkən yazılıb** (Gün 9-da yoxlanılır, Gün 13-də təmizlənir): oturacaq xəritəsi `GET /api/v1/flights/{id}/seatmap` (strukturlu JSON) və server tərəfli SVG köməkçi endpoint-i.
+- **Gün 13 (TAMAMLANDI):** Vahid `SeatDto` (`Status` mətn enum + `HeldByMe`, `SvgMap` əsas cavabdan çıxarıldı: `147 467 → 66 085` bayt), qlobal `JsonStringEnumConverter`, `Select` + `AsNoTracking` proyeksiya (2 SQL komanda, `Include` yox, SQL `TicketSpecifications.IsActive`), `PricingService` (`ValidateOnStart`, tək qiymət mənbəyi, 72h daxil `AwayFromZero`), `POST /api/v1/bookings/quote` (`[AllowAnonymous]`, `400/404/409` qaydaları), 186 test (135 unit + 51 inteqrasiya) yaşıl. (`/seatmap/svg` köməkçi endpoint kimi saxlanılıb.)
 
 ## 2. Dəyişməz qərarlar
 
@@ -102,15 +102,15 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Commit-lər:** `c0d044e`, `18c7c4f`, `c885e39`, `1d6295e`, `bd62811`
 **Bitmə meyarı:** Scalar-da qeydiyyat, giriş, token ilə `me` işləyir, qorunan endpoint tokensiz 401 verir.
 
-### Gün 13: Oturacaq xəritəsi müqaviləsinin təmizlənməsi, qiymət və quote
+### Gün 13: Oturacaq xəritəsi müqaviləsinin təmizlənməsi, qiymət və quote (TAMAMLANDI)
 **Branch:** `feat/seatmap-contract-and-pricing`
-`GET /api/v1/flights/{id}/seatmap` artıq var (köhnə Gün 9). Bu gün onu **kilid və blokla uyğun** edirik.
-- [ ] `SeatMapDto` müqaviləsi: `bool IsOccupied` → `Status` (`Available`, `Occupied`, `Held`, `Blocked`, JSON-da mətn kimi, `JsonStringEnumConverter`) və `heldByMe` (token varsa). **`SvgMap` əsas cavabdan çıxarılır** (hər sorğuda yüzlərlə oturacağın SVG sətri göndərmək lazımsızdır; server tərəfli SVG ayrıca endpoint kimi qala bilər, Client xəritəni JSON-dan çəkir). `FlightSeatDto` adı `SeatDto` olur (`FlightSeat` entity-si yoxdur)
-- [ ] Doluluq sorğusu yalnız aktiv biletləri sayır (ləğv, silinmiş, `Cancelled` rezervasiya çıxarılır, bu hissə var). Bütün uçuşu bilet və rezervasiyalarla yükləmək əvəzinə **`Select` proyeksiyası** ilə tək sorğu
-- [ ] `PricingService`: `BasePrice × Seat.BasePriceMultiplier` (business, exit row), pəncərə/keçid əlavə haqqı (konfiqurasiya), son 3 gündə tələbat çarpanı (default ×1.2). Xəritədəki `Price` **yalnız bu servisdən** gəlir (iki ayrı qiymət məntiqi olmasın)
-- [ ] `POST /api/v1/bookings/quote` (flightId, seatIds) → sətir-sətir döküm və yekun
-- [ ] Testlər: xəritə statusları, table-driven qiymət testləri (economy, business, exit row, pəncərə, tələbat, yuvarlaqlaşdırma)
-**Commit-lər:** `refactor(seats): replace occupied flag with seat status and drop svg from main dto`, `perf(seats): project seat map in a single query`, `feat(pricing): add pricing service with configurable fees`, `feat(bookings): add quote endpoint`, `test(pricing): add table driven pricing tests`
+`GET /api/v1/flights/{id}/seatmap` xəritə müqaviləsi, proyeksiya, `PricingService` və `quote` endpoint-i tamamlandı.
+- [x] `SeatMapDto` müqaviləsi: qlobal `JsonStringEnumConverter`, vahid `SeatDto` (`Status`: `Available`/`Occupied`/`Held`/`Blocked`, `HeldByMe` Gün 14-ə qədər `false` XML şərhi ilə), **`SvgMap` əsas cavabdan çıxarıldı** (`147 467 → 66 085` bayt; `/seatmap/svg` saxlanılıb) + xəritə müqavilə testləri
+- [x] Doluluq sorğusu: `.Include()` olmadan `Select` + `AsNoTracking` proyeksiyası, SQL-ə çevrilən `TicketSpecifications.IsActive` `Expression`-i, runtime EF logu ilə **2 SQL komandası** sübutu
+- [x] `PricingService`: `round((flightBasePrice × seatMultiplier + positionFee) × demandMultiplier, 2, AwayFromZero)` (`WindowFee` > `AisleFee` > `0`, `(departureUtc - utcNow) <= LastMinuteDays × 24h` daxil), `PricingSettings` `ValidateOnStart`, `TimeProvider` 72h/72h01m testləri (17 test halı) və xəritə handler-də tək qiymət mənbəyi
+- [x] `POST /api/v1/bookings/quote` (`[AllowAnonymous]`, məlumat xarakterli — checkout yenidən hesablayır, `TotalPrice` = yuvarlaqlaşdırılmış sətirlərin cəmi; `400` başqa təyyarə/validasiya, `404` naməlum reys/oturacaq, `409` satılmayan reys/tutulmuş yer nömrələri) + 21 validator/handler testi
+- [x] İnteqrasiya testləri: Boeing 777 `3-4-3` (`I` olmadan), canlı `/quote` vs `/seatmap` 1:1 qiymət uyğunluğu və xəta kodları, `PricingSettings` startup `ValidateOnStart` (186/186 test yaşıl)
+**Commit-lər:** `13a15b1`, `b3c2694`, `aaf76f5`, `980569e`, `2d6a85f`
 **Bitmə meyarı:** 777 üçün 3-4-3 xəritə `Status` ilə qayıdır, quote düzgün rəqəmlər verir.
 
 ### Gün 14: Oturacaq kilidi (`SeatHold`, bazada)
@@ -119,6 +119,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [ ] `POST /api/v1/flights/{id}/holds` `[Authorize]`, body `{ seatIds: [] }`, **atomik** (hamısı və ya heç biri), ≤ 9 yer. Tranzaksiyada: (1) bu istifadəçinin həmin reysdəki köhnə hold-larını burax, (2) seçilmiş yerlərin **vaxtı keçmiş hold-larını sil** (Hold qaydası), (3) yerlərin həmin təyyarəyə aid olduğunu, aktiv biletlə dolu və ya bloklu olmadığını yoxla, (4) yaz. Unikal indeks pozuntusu → `ConflictException` (409). `ExpiresAtUtc = TimeProvider + Hold:Minutes` (default 10), **uzatma yoxdur**
 - [ ] `GET /api/v1/flights/{id}/holds/mine` (qalan vaxtla), `DELETE /api/v1/flights/{id}/holds` (öz hold-larını burax)
 - [ ] Xəritə: başqasının aktiv hold-u `Held`, öz hold-u `Held` + `heldByMe = true`
+- [ ] Yüngül status yeniləmə endpoint-i: `GET /api/v1/flights/{id}/seatmap/status` (tam xəritə bir dəfə yüklənir, sonrakı yeniləmələrdə yalnız oturacaq statusları və `heldByMe` qayıdır)
 - [ ] `HoldCleanupService` (`BackgroundService`, hər 30 san, vaxtı keçmişləri silir, `TimeProvider`)
 - [ ] Testlər: iki istifadəçi eyni yeri kilidləyir (biri 409), vaxtı bitmiş hold götürülür (`FakeTimeProvider`), 9-dan çox yer rədd, başqasının hold-unu buraxmaq olmur. **Paralel inteqrasiya testi** (real SQL Server test bazası)
 **Commit-lər:** `feat(domain): add seat hold entity`, `feat(infra): add seat hold configuration and migration`, `feat(seats): add atomic multi seat hold command`, `feat(seats): add release and my holds endpoints`, `feat(seats): add hold cleanup background service`, `test(seats): cover hold conflicts expiry and parallel access`
@@ -248,7 +249,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 28: Admin MVC skeleti
 **Branch:** `feat/admin-foundation`
-- [ ] Cookie autentifikasiyası, JWT cookie claim-ində; `JwtDelegatingHandler` hər `HttpClient` sorğusuna token əlavə edir; `AddHttpClient<T>()`
+- [ ] Cookie autentifikasiyası, JWT cookie claim-ində; `JwtDelegatingHandler` hər `HttpClient` sorğusuna token əlavə edir; `AddHttpClient<T>()` (API ilə eyni `JsonStringEnumConverter` JSON seçimləri ilə — əks halda mətn enumlar deserializasiya xətası verər)
 - [ ] `AdminOnly` siyasəti, login/logout, layout (Bootstrap 5), `TempData` bildirişləri, səhifələmə partial-ı, `ValidateAntiForgeryToken`, API xətalarını `ModelState`-ə çevirmə
 - [ ] API-də `/api/v1/admin/*` üçün `[Authorize(Roles = "Admin")]`
 - [ ] **Admin heç bir daxili layihəyə istinad etmir** (`.csproj` yoxlanır)

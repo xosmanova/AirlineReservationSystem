@@ -173,6 +173,67 @@ public class FlightRepository : GenericRepository<Flight>, IFlightRepository
             .FirstOrDefaultAsync(f => f.Id == flightId, cancellationToken);
     }
 
+    public async Task<FlightSeatMapData?> GetFlightSeatMapDataAsync(int flightId, CancellationToken cancellationToken = default)
+    {
+        // SQL Command 1: Project flight header and aircraft seats via Select + AsNoTracking (no Include)
+        var flightData = await _dbSet
+            .AsNoTracking()
+            .Where(f => f.Id == flightId)
+            .Select(f => new
+            {
+                f.Id,
+                f.FlightNumber,
+                AirlineName = f.Airline != null ? f.Airline.Name : string.Empty,
+                f.AircraftId,
+                AircraftModel = f.Aircraft != null ? f.Aircraft.Model : string.Empty,
+                f.BasePrice,
+                f.DepartureTimeUtc,
+                f.Status,
+                Seats = f.Aircraft!.Seats
+                    .OrderBy(s => s.RowNumber)
+                    .ThenBy(s => s.ColumnLetter)
+                    .Select(s => new SeatMapSeatItem(
+                        s.Id,
+                        s.AircraftId,
+                        s.SeatNumber,
+                        s.RowNumber,
+                        s.ColumnLetter,
+                        s.SeatClass,
+                        s.BasePriceMultiplier,
+                        s.IsWindow,
+                        s.IsAisle,
+                        s.IsExitRow))
+                    .ToList()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (flightData == null)
+        {
+            return null;
+        }
+
+        // SQL Command 2: Active occupied seat IDs translated directly from TicketSpecifications.IsActive Expression
+        var occupiedSeatIds = await _context.Tickets
+            .AsNoTracking()
+            .Where(t => t.FlightId == flightId)
+            .Where(TicketSpecifications.IsActive)
+            .Select(t => t.SeatId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return new FlightSeatMapData(
+            flightData.Id,
+            flightData.FlightNumber,
+            flightData.AirlineName,
+            flightData.AircraftId,
+            flightData.AircraftModel,
+            flightData.BasePrice,
+            flightData.DepartureTimeUtc,
+            flightData.Status,
+            flightData.Seats,
+            occupiedSeatIds.ToHashSet());
+    }
+
     public async Task<IReadOnlyList<Flight>> GetUpcomingFlightsAsync(int count = 10, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

@@ -1,13 +1,19 @@
 using AirlineReservation.Application.DTOs.Seat;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Net;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Flight;
+using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.IntegrationTests.Fixtures;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace AirlineReservation.IntegrationTests.Controllers;
@@ -16,6 +22,10 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public FlightsControllerIntegrationTests(CustomWebApplicationFactory factory)
     {
@@ -44,7 +54,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=2&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response2p.StatusCode);
-        var result2p = await response2p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result2p = await response2p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result2p);
         Assert.NotNull(result2p.Data);
 
@@ -56,7 +66,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response1p.StatusCode);
-        var result1p = await response1p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result1p = await response1p.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result1p);
         Assert.NotNull(result1p.Data);
 
@@ -77,7 +87,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=1&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage1.StatusCode);
-        var page1 = await resPage1.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page1 = await resPage1.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page1?.Data);
         Assert.Equal(14, page1.Data.TotalCount);
         Assert.Equal(5, page1.Data.Items.Count);
@@ -91,7 +101,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=2&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage2.StatusCode);
-        var page2 = await resPage2.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page2 = await resPage2.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page2?.Data);
         Assert.Equal(14, page2.Data.TotalCount);
         Assert.Equal(5, page2.Data.Items.Count);
@@ -104,7 +114,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&page=3&pageSize=5");
 
         Assert.Equal(HttpStatusCode.OK, resPage3.StatusCode);
-        var page3 = await resPage3.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var page3 = await resPage3.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(page3?.Data);
         Assert.Equal(14, page3.Data.TotalCount);
         Assert.Equal(4, page3.Data.Items.Count);
@@ -125,7 +135,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result?.Data);
 
         var delayedFlight = Assert.Single(result.Data.Items, f => f.Id == delayedFlightId);
@@ -144,7 +154,7 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         Assert.NotNull(result?.Data);
 
         Assert.DoesNotContain(result.Data.Items, f => f.Id == cancelledFlightId);
@@ -161,18 +171,221 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         var searchResp = await _client.GetAsync(
             $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
         Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
-        var searchResult = await searchResp.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>();
+        var searchResult = await searchResp.Content.ReadFromJsonAsync<ApiResponse<PagedResult<FlightDto>>>(JsonOptions);
         var flightInSearch = Assert.Single(searchResult!.Data!.Items, f => f.Id == flight1Id);
 
         // 2. SeatMap endpoint
         var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
         Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
-        var seatMapResult = await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>();
+        var seatMapResult = await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>(JsonOptions);
         Assert.NotNull(seatMapResult?.Data);
 
         // 3. Exact equality between search and seat map
         Assert.Equal(flightInSearch.AvailableSeatsCount, seatMapResult.Data.AvailableSeatsCount);
-        int countedFreeSeatsInRows = seatMapResult.Data.Rows.SelectMany(r => r.Seats).Count(s => !s.IsOccupied);
+        int countedFreeSeatsInRows = seatMapResult.Data.Rows.SelectMany(r => r.Seats).Count(s => s.Status == SeatStatus.Available);
         Assert.Equal(flightInSearch.AvailableSeatsCount, countedFreeSeatsInRows);
+    }
+
+    [Fact]
+    public async Task SeatMap_And_FlightSearch_SerializeEnumsAsStrings_AndOmitSvgMap()
+    {
+        int depId = _factory.TestDepartureAirportId;
+        int arrId = _factory.TestArrivalAirportId;
+        int flight1Id = _factory.TestFlight1Id;
+
+        var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
+        string seatMapJson = await seatMapResp.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"status\":\"Available\"", seatMapJson);
+        Assert.Contains("\"status\":\"Occupied\"", seatMapJson);
+        Assert.Contains("\"seatClass\":\"Economy\"", seatMapJson);
+        Assert.Contains("\"heldByMe\":false", seatMapJson);
+        Assert.DoesNotContain("\"svgMap\"", seatMapJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"isOccupied\"", seatMapJson, StringComparison.OrdinalIgnoreCase);
+
+        var searchResp = await _client.GetAsync(
+            $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=50");
+        Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
+        string searchJson = await searchResp.Content.ReadAsStringAsync();
+
+        Assert.Contains("\"status\":\"Scheduled\"", searchJson);
+        Assert.Contains("\"status\":\"Delayed\"", searchJson);
+
+        var svgResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap/svg");
+        Assert.Equal(HttpStatusCode.OK, svgResp.StatusCode);
+        Assert.Equal("image/svg+xml", svgResp.Content.Headers.ContentType?.MediaType);
+        string svg = await svgResp.Content.ReadAsStringAsync();
+        Assert.StartsWith("<svg", svg);
+    }
+
+    [Fact]
+    public async Task SeatMap_ProjectionQuery_ExcludesCancelledTicketsAndCancelledBookings_InSql()
+    {
+        int flight1Id = _factory.TestFlight1Id;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var ownerUserId = await context.Users.Select(u => u.Id).FirstAsync();
+            var seat1B = await context.Seats.FirstAsync(s => s.SeatNumber == "1B");
+            var passengerId = await context.Passengers.Select(p => p.Id).FirstAsync();
+
+            var cancelledBooking = new Booking
+            {
+                UserId = ownerUserId,
+                PnrCode = "CNCL01",
+                ContactEmail = "cancel@airline.test",
+                ContactPhone = "+994501112233",
+                Status = BookingStatus.Cancelled,
+                TotalAmount = 150m
+            };
+            context.Bookings.Add(cancelledBooking);
+
+            var confirmedBooking = new Booking
+            {
+                UserId = ownerUserId,
+                PnrCode = "CONF02",
+                ContactEmail = "conf@airline.test",
+                ContactPhone = "+994501112244",
+                Status = BookingStatus.Confirmed,
+                TotalAmount = 150m
+            };
+            context.Bookings.Add(confirmedBooking);
+            await context.SaveChangesAsync();
+
+            // Ticket from a Cancelled booking + Cancelled ticket from a Confirmed booking on Seat 1B
+            context.Tickets.AddRange(
+                new Ticket
+                {
+                    TicketNumber = "ET-CNCL-001",
+                    FlightId = flight1Id,
+                    BookingId = cancelledBooking.Id,
+                    PassengerId = passengerId,
+                    SeatId = seat1B.Id,
+                    Price = 150m,
+                    IsCancelled = false
+                },
+                new Ticket
+                {
+                    TicketNumber = "ET-CNCL-002",
+                    FlightId = flight1Id,
+                    BookingId = confirmedBooking.Id,
+                    PassengerId = passengerId,
+                    SeatId = seat1B.Id,
+                    Price = 150m,
+                    IsCancelled = true
+                });
+            await context.SaveChangesAsync();
+        }
+
+        var response = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var seatMap = (await response.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>(JsonOptions))!.Data!;
+        var seat1A = seatMap.Rows.SelectMany(r => r.Seats).Single(s => s.SeatNumber == "1A");
+        var seat1BResult = seatMap.Rows.SelectMany(r => r.Seats).Single(s => s.SeatNumber == "1B");
+
+        Assert.Equal(SeatStatus.Occupied, seat1A.Status);
+        Assert.Equal(SeatStatus.Available, seat1BResult.Status);
+        Assert.Equal(1, seatMap.OccupiedSeatsCount);
+        Assert.Equal(1, seatMap.AvailableSeatsCount);
+    }
+
+    [Fact]
+    public async Task SeatMap_WidebodyBoeing777_Returns343Layout_WithoutColumnI_AndWithExactPricing()
+    {
+        int b777FlightId;
+        var row1Cols = new[] { "A", "B", "D", "G", "J", "K" };
+        var row10Cols = new[] { "A", "B", "C", "D", "E", "F", "G", "H", "J", "K" };
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var airlineId = await context.Airlines.Select(a => a.Id).FirstAsync();
+
+            var b777 = new Aircraft
+            {
+                Model = "Boeing 777-300ER",
+                TailNumber = "TEST-B77W-1",
+                TotalSeats = 16,
+                AirlineId = airlineId
+            };
+            context.Aircrafts.Add(b777);
+
+            foreach (var col in row1Cols)
+            {
+                context.Seats.Add(new Seat
+                {
+                    Aircraft = b777,
+                    SeatNumber = $"1{col}",
+                    RowNumber = 1,
+                    ColumnLetter = col,
+                    SeatClass = SeatClass.Business,
+                    BasePriceMultiplier = 2.0m,
+                    IsWindow = col is "A" or "K",
+                    IsAisle = col is "B" or "D" or "G" or "J"
+                });
+            }
+
+            foreach (var col in row10Cols)
+            {
+                context.Seats.Add(new Seat
+                {
+                    Aircraft = b777,
+                    SeatNumber = $"10{col}",
+                    RowNumber = 10,
+                    ColumnLetter = col,
+                    SeatClass = SeatClass.Economy,
+                    BasePriceMultiplier = 1.0m,
+                    IsWindow = col is "A" or "K",
+                    IsAisle = col is "C" or "D" or "G" or "H",
+                    IsExitRow = true
+                });
+            }
+
+            var flight = new Flight
+            {
+                FlightNumber = "J2-777",
+                AirlineId = airlineId,
+                Aircraft = b777,
+                DepartureAirportId = _factory.TestDepartureAirportId,
+                ArrivalAirportId = _factory.TestArrivalAirportId,
+                // +10 days from FixedTimeProvider (2026-11-10) -> standard demand window
+                DepartureTimeUtc = new DateTime(2026, 11, 20, 8, 0, 0, DateTimeKind.Utc),
+                ArrivalTimeUtc = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc),
+                BasePrice = 200.00m,
+                Stops = 0,
+                Status = FlightStatus.Scheduled
+            };
+            context.Flights.Add(flight);
+            await context.SaveChangesAsync();
+            b777FlightId = flight.Id;
+        }
+
+        var response = await _client.GetAsync($"/api/v1/flights/{b777FlightId}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var rawJson = await response.Content.ReadAsStringAsync();
+        Assert.Contains("\"status\":\"Available\"", rawJson);
+        Assert.Contains("\"seatClass\":\"Business\"", rawJson);
+        Assert.Contains("\"seatClass\":\"Economy\"", rawJson);
+        Assert.DoesNotContain("\"svgMap\"", rawJson, StringComparison.OrdinalIgnoreCase);
+
+        var seatMap = JsonSerializer.Deserialize<ApiResponse<SeatMapDto>>(rawJson, JsonOptions)!.Data!;
+        Assert.Equal(16, seatMap.TotalSeats);
+
+        var allColumns = seatMap.Rows.SelectMany(r => r.Seats).Select(s => s.ColumnLetter).Distinct().ToList();
+        Assert.DoesNotContain("I", allColumns);
+
+        var row10 = Assert.Single(seatMap.Rows, r => r.RowNumber == 10);
+        Assert.Equal(10, row10.Seats.Count);
+        Assert.Equal(row10Cols, row10.Seats.Select(s => s.ColumnLetter).ToArray());
+
+        var allSeats = seatMap.Rows.SelectMany(r => r.Seats).ToDictionary(s => s.SeatNumber);
+        Assert.Equal(410.00m, allSeats["1A"].Price);  // 200 * 2.0 + 10
+        Assert.Equal(210.00m, allSeats["10A"].Price); // 200 * 1.0 + 10
+        Assert.Equal(205.00m, allSeats["10C"].Price); // 200 * 1.0 + 5
+        Assert.Equal(200.00m, allSeats["10B"].Price); // 200 * 1.0 + 0
     }
 }
