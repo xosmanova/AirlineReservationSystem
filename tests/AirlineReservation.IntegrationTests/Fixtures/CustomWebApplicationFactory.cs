@@ -100,6 +100,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             (await context.Database.GetPendingMigrationsAsync()).Any())
         {
             await context.Database.ExecuteSqlRawAsync(@"
+                IF OBJECT_ID('dbo.SeatHolds', 'U') IS NOT NULL DELETE FROM [SeatHolds];
                 IF OBJECT_ID('dbo.Tickets', 'U') IS NOT NULL DELETE FROM [Tickets];
                 IF OBJECT_ID('dbo.Bookings', 'U') IS NOT NULL DELETE FROM [Bookings];
             ");
@@ -116,6 +117,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         EnsureTestDatabaseOrThrow(context);
 
         await context.Database.ExecuteSqlRawAsync(@"
+            DELETE FROM [SeatHolds];
             DELETE FROM [Tickets];
             DELETE FROM [Bookings];
             DELETE FROM [Passengers];

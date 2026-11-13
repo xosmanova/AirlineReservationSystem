@@ -1,3 +1,4 @@
+using AirlineReservation.Application.DTOs.Booking;
 using AirlineReservation.Application.DTOs.Seat;
 using System.Linq;
 using System.Text.Json;
@@ -387,5 +388,35 @@ public class FlightsControllerIntegrationTests : IClassFixture<CustomWebApplicat
         Assert.Equal(210.00m, allSeats["10A"].Price); // 200 * 1.0 + 10
         Assert.Equal(205.00m, allSeats["10C"].Price); // 200 * 1.0 + 5
         Assert.Equal(200.00m, allSeats["10B"].Price); // 200 * 1.0 + 0
+    }
+
+    [Fact]
+    public async Task FlightSearch_And_SeatMap_SerializeUtcDateTimeWithTrailingZ()
+    {
+        int depId = _factory.TestDepartureAirportId;
+        int arrId = _factory.TestArrivalAirportId;
+        int flight1Id = _factory.TestFlight1Id;
+
+        // 1. Search endpoint
+        var searchResp = await _client.GetAsync(
+            $"/api/v1/flights/search?departureAirportId={depId}&arrivalAirportId={arrId}&departureDate=2026-11-10&passengersCount=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
+        string searchJson = await searchResp.Content.ReadAsStringAsync();
+
+        // Must serialize with ISO 8601 trailing Z (e.g., "2026-11-10T08:00:00Z")
+        Assert.Matches(@"""departureTimeUtc""\s*:\s*""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z""", searchJson);
+        Assert.Matches(@"""arrivalTimeUtc""\s*:\s*""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z""", searchJson);
+
+        // 2. Quote endpoint
+        var seatMapResp = await _client.GetAsync($"/api/v1/flights/{flight1Id}/seatmap");
+        Assert.Equal(HttpStatusCode.OK, seatMapResp.StatusCode);
+        var seatMap = (await seatMapResp.Content.ReadFromJsonAsync<ApiResponse<SeatMapDto>>(JsonOptions))!.Data!;
+        var freeSeatId = seatMap.Rows.SelectMany(r => r.Seats).First(s => s.Status == SeatStatus.Available).Id;
+
+        var quoteResp = await _client.PostAsJsonAsync("/api/v1/bookings/quote", new BookingQuoteRequestDto(flight1Id, [freeSeatId]));
+        Assert.Equal(HttpStatusCode.OK, quoteResp.StatusCode);
+        string quoteJson = await quoteResp.Content.ReadAsStringAsync();
+
+        Assert.Matches(@"""departureTimeUtc""\s*:\s*""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z""", quoteJson);
     }
 }

@@ -431,6 +431,45 @@ namespace AirlineReservation.Infrastructure.Migrations
                     b.ToTable("Seats");
                 });
 
+            modelBuilder.Entity("AirlineReservation.Domain.Entities.SeatHold", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FlightId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SeatId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("SeatId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("FlightId", "SeatId")
+                        .IsUnique();
+
+                    b.HasIndex("FlightId", "UserId");
+
+                    b.ToTable("SeatHolds", (string)null);
+                });
+
             modelBuilder.Entity("AirlineReservation.Domain.Entities.Ticket", b =>
                 {
                     b.Property<int>("Id")
@@ -774,6 +813,31 @@ namespace AirlineReservation.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Aircraft");
+                });
+
+            modelBuilder.Entity("AirlineReservation.Domain.Entities.SeatHold", b =>
+                {
+                    b.HasOne("AirlineReservation.Domain.Entities.Flight", "Flight")
+                        .WithMany()
+                        .HasForeignKey("FlightId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AirlineReservation.Domain.Entities.Seat", "Seat")
+                        .WithMany()
+                        .HasForeignKey("SeatId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AirlineReservation.Infrastructure.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Flight");
+
+                    b.Navigation("Seat");
                 });
 
             modelBuilder.Entity("AirlineReservation.Domain.Entities.Ticket", b =>
