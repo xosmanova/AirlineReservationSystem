@@ -9,6 +9,8 @@ using AirlineReservation.Application.Features.Flights.Queries.GetFlightById;
 using AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
 using AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 using AirlineReservation.Application.Features.Seats.Commands.CreateSeatHold;
+using AirlineReservation.Application.Features.Seats.Commands.ReleaseSeatHolds;
+using AirlineReservation.Application.Features.Seats.Queries.GetMySeatHolds;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -111,6 +113,57 @@ public class FlightsController : BaseApiController
         }
 
         var command = new CreateSeatHoldCommand(id, userId, dto?.SeatIds ?? Array.Empty<int>());
+        var result = await Mediator.Send(command);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Retrieves active seat holds on a specific flight for the authenticated user, including server-computed remaining seconds.
+    /// </summary>
+    /// <param name="id">Unique identifier of the flight.</param>
+    /// <returns>Standardized ApiResponse containing held seats and remaining hold seconds.</returns>
+    [HttpGet("{id:int}/holds/mine")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<SeatHoldResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyHolds(int id)
+    {
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                          ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedException("Invalid or missing user identity in access token.");
+        }
+
+        var query = new GetMySeatHoldsQuery(id, userId);
+        var result = await Mediator.Send(query);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Idempotently releases all active seat holds on a specific flight for the authenticated user.
+    /// Leaves holds belonging to other passengers completely untouched.
+    /// </summary>
+    /// <param name="id">Unique identifier of the flight.</param>
+    /// <returns>Standardized ApiResponse confirming release of holds.</returns>
+    [HttpDelete("{id:int}/holds")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReleaseMyHolds(int id)
+    {
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                          ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedException("Invalid or missing user identity in access token.");
+        }
+
+        var command = new ReleaseSeatHoldsCommand(id, userId);
         var result = await Mediator.Send(command);
         return StatusCode(result.StatusCode, result);
     }
