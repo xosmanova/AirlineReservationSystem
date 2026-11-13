@@ -33,6 +33,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public int TestDepartureAirportId { get; private set; }
     public int TestArrivalAirportId { get; private set; }
 
+    public MutableTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -61,7 +63,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:ExpiryMinutes"] = "60",
                 ["Jwt:Key"] = TestJwtKey,
                 ["RateLimiting:Login:PermitLimit"] = "100",
-                ["RateLimiting:Login:WindowSeconds"] = "60"
+                ["RateLimiting:Login:WindowSeconds"] = "60",
+                ["Hold:CleanupEnabled"] = "false"
             });
         });
 
@@ -84,8 +87,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             {
                 services.Remove(timeDescriptor);
             }
-            services.AddSingleton<TimeProvider>(
-                new FixedTimeProvider(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero)));
+            services.AddSingleton<TimeProvider>(Clock);
         });
     }
 
@@ -134,6 +136,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             DELETE FROM [AspNetRoleClaims];
             DELETE FROM [AspNetRoles];
         ");
+
+        Clock.SetUtcNow(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero));
     }
 
     public async Task SeedTestDataAsync()
@@ -318,8 +322,14 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         }
     }
 
-    private sealed class FixedTimeProvider(DateTimeOffset fixedUtcNow) : TimeProvider
+    public sealed class MutableTimeProvider(DateTimeOffset initialUtcNow) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => fixedUtcNow;
+        private DateTimeOffset _current = initialUtcNow;
+
+        public override DateTimeOffset GetUtcNow() => _current;
+
+        public void SetUtcNow(DateTimeOffset utcNow) => _current = utcNow;
+
+        public void Advance(TimeSpan delta) => _current = _current.Add(delta);
     }
 }
