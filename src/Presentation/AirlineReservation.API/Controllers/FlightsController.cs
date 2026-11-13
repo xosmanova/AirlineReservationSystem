@@ -10,6 +10,7 @@ using AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatMap;
 using AirlineReservation.Application.Features.Flights.Queries.SearchFlights;
 using AirlineReservation.Application.Features.Seats.Commands.CreateSeatHold;
 using AirlineReservation.Application.Features.Seats.Commands.ReleaseSeatHolds;
+using AirlineReservation.Application.Features.Seats.Queries.GetFlightSeatStatus;
 using AirlineReservation.Application.Features.Seats.Queries.GetMySeatHolds;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,15 +52,35 @@ public class FlightsController : BaseApiController
 
     /// <summary>
     /// Retrieves structured aircraft cabin seat map with real-time seat statuses and dynamic pricing.
+    /// Supports optional user authentication to flag heldByMe seats without rejecting anonymous callers.
     /// </summary>
     /// <param name="id">Unique identifier of the flight.</param>
     /// <returns>Standardized ApiResponse containing structured seat map rows.</returns>
     [HttpGet("{id:int}/seatmap")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<SeatMapDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetSeatMap(int id)
     {
-        var result = await Mediator.Send(new GetFlightSeatMapQuery(id));
+        var userId = TryExtractUserId();
+        var result = await Mediator.Send(new GetFlightSeatMapQuery(id, userId));
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Retrieves lightweight delta seat availability and hold statuses for interactive map polling.
+    /// Returns only non-available (Held, Occupied, Blocked) seats and server generation timestamp.
+    /// </summary>
+    /// <param name="id">Unique identifier of the flight.</param>
+    /// <returns>Standardized ApiResponse containing non-available seat statuses and generation timestamp.</returns>
+    [HttpGet("{id:int}/seatmap/status")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<SeatStatusSummaryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetSeatMapStatus(int id)
+    {
+        var userId = TryExtractUserId();
+        var result = await Mediator.Send(new GetFlightSeatStatusQuery(id, userId));
         return StatusCode(result.StatusCode, result);
     }
 
@@ -166,5 +187,18 @@ public class FlightsController : BaseApiController
         var command = new ReleaseSeatHoldsCommand(id, userId);
         var result = await Mediator.Send(command);
         return StatusCode(result.StatusCode, result);
+    }
+
+    private Guid? TryExtractUserId()
+    {
+        if (User?.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                          ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(userIdClaim, out var userId) ? userId : null;
     }
 }

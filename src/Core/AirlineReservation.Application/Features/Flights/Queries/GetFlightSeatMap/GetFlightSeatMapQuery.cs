@@ -7,4 +7,4 @@ namespace AirlineReservation.Application.Features.Flights.Queries.GetFlightSeatM
 /// <summary>
 /// CQRS Query for retrieving complete interactive seat map and cabin layout for a specific flight.
 /// </summary>
-public record GetFlightSeatMapQuery(int FlightId) : IRequest<ApiResponse<SeatMapDto>>;
+public record GetFlightSeatMapQuery(int FlightId, Guid? UserId = null) : IRequest<ApiResponse<SeatMapDto>>;
