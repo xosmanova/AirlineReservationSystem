@@ -141,6 +141,7 @@ public class GetFlightSeatMapQueryHandlerTests
         public ISeatRepository Seats => throw new NotImplementedException();
         public IAirportRepository Airports => throw new NotImplementedException();
         public IAirlineRepository Airlines => throw new NotImplementedException();
+        public ISeatHoldRepository SeatHolds => throw new NotImplementedException();
 
         public FakeUnitOfWork(IFlightRepository flightRepository)
         {

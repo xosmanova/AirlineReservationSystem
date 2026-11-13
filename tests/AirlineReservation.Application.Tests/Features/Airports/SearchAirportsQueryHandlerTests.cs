@@ -88,6 +88,7 @@ public class SearchAirportsQueryHandlerTests
         public ISeatRepository Seats { get; }
         public IAirportRepository Airports { get; }
         public IAirlineRepository Airlines { get; }
+        public ISeatHoldRepository SeatHolds => throw new NotImplementedException();
 
         public IGenericRepository<T> Repository<T>() where T : BaseEntity => throw new NotImplementedException();
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => Task.FromResult(1);

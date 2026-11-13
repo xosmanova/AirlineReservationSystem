@@ -189,6 +189,7 @@ public class GetBookingQuoteQueryHandlerTests
         public ISeatRepository Seats { get; }
         public IAirportRepository Airports => throw new NotImplementedException();
         public IAirlineRepository Airlines => throw new NotImplementedException();
+        public ISeatHoldRepository SeatHolds => throw new NotImplementedException();
 
         public FakeUnitOfWork(IFlightRepository flights, ISeatRepository seats)
         {
