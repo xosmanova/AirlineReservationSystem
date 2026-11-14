@@ -115,14 +115,15 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 14: Oturacaq kilidi (`SeatHold`, bazada)
 **Branch:** `feat/seat-hold`
-- [ ] `SeatHold` entity (`FlightId`, `SeatId`, `UserId`, `ExpiresAtUtc`), **soft delete yoxdur** (fiziki silinir), `(FlightId, SeatId)` üzərində **filtrsiz unikal indeks**, `UserId` indeksi, migration (alətlə), `has-pending-model-changes` exit 0
-- [ ] `POST /api/v1/flights/{id}/holds` `[Authorize]`, body `{ seatIds: [] }`, **atomik** (hamısı və ya heç biri), ≤ 9 yer. Tranzaksiyada: (1) bu istifadəçinin həmin reysdəki köhnə hold-larını burax, (2) seçilmiş yerlərin **vaxtı keçmiş hold-larını sil** (Hold qaydası), (3) yerlərin həmin təyyarəyə aid olduğunu, aktiv biletlə dolu və ya bloklu olmadığını yoxla, (4) yaz. Unikal indeks pozuntusu → `ConflictException` (409). `ExpiresAtUtc = TimeProvider + Hold:Minutes` (default 10), **uzatma yoxdur**
-- [ ] `GET /api/v1/flights/{id}/holds/mine` (qalan vaxtla), `DELETE /api/v1/flights/{id}/holds` (öz hold-larını burax)
-- [ ] Xəritə: başqasının aktiv hold-u `Held`, öz hold-u `Held` + `heldByMe = true`
-- [ ] Yüngül status yeniləmə endpoint-i: `GET /api/v1/flights/{id}/seatmap/status` (tam xəritə bir dəfə yüklənir, sonrakı yeniləmələrdə yalnız oturacaq statusları və `heldByMe` qayıdır)
-- [ ] `HoldCleanupService` (`BackgroundService`, hər 30 san, vaxtı keçmişləri silir, `TimeProvider`)
-- [ ] Testlər: iki istifadəçi eyni yeri kilidləyir (biri 409), vaxtı bitmiş hold götürülür (`FakeTimeProvider`), 9-dan çox yer rədd, başqasının hold-unu buraxmaq olmur. **Paralel inteqrasiya testi** (real SQL Server test bazası)
-**Commit-lər:** `feat(domain): add seat hold entity`, `feat(infra): add seat hold configuration and migration`, `feat(seats): add atomic multi seat hold command`, `feat(seats): add release and my holds endpoints`, `feat(seats): add hold cleanup background service`, `test(seats): cover hold conflicts expiry and parallel access`
+- [x] `SeatHold` entity (`FlightId`, `SeatId`, `UserId`, `ExpiresAtUtc`), **soft delete yoxdur** (fiziki silinir), `(FlightId, SeatId)` üzərində **filtrsiz unikal indeks**, `(FlightId, UserId)` kompozit indeksi, `ExpiresAtUtc` indeksi, Restrict FK-lar, migration `AddSeatHoldTable`, `has-pending-model-changes` exit 0, UTC DateTime converter ilə ISO 8601 trailing 'Z' təminatı
+- [x] SQL 2601/2627 unikal xətalarının UnitOfWork-də tutulub `UniqueConstraintViolationException`-a tərcüməsi, handler-də mənalı `ConflictException` (409) atılması
+- [x] `POST /api/v1/flights/{id}/holds` `[Authorize]`, body `{ seatIds: [] }`, **atomik** (hamısı və ya heç biri), 1-9 yer. Tranzaksiyada: (1) bu istifadəçinin başqa reyslərdəki hold-larını burax (hold-spam qoruması), (2) seçilmiş yerlərin **vaxtı keçmiş hold-larını sil** (Hold qaydası), (3) yerlərin həmin təyyarəyə aid olduğunu, aktiv biletlə dolu olmadığını və başqası tərəfindən tutulmadığını yoxla, (4) istifadəçinin bu reysdəki əvvəlki hold-larını əvəzlə, (5) yaz. Unikal indeks pozuntusunda rollback və 409. `ExpiresAtUtc = TimeProvider + Hold:Minutes` (default 10)
+- [x] `GET /api/v1/flights/{id}/holds/mine` (server tərəfindən hesablanmış `RemainingSeconds` ilə), `DELETE /api/v1/flights/{id}/holds` (öz hold-larını idempotent burax)
+- [x] Xəritə: başqasının aktiv hold-u `Held`, öz hold-u `Held` + `heldByMe = true`, prioritet: `Blocked > Occupied > Held > Available`
+- [x] Yüngül status yeniləmə endpoint-i: `GET /api/v1/flights/{id}/seatmap/status` (yalnız Available olmayan yerlər və `generatedAtUtc`, eyni `SeatStatusResolver` qaydası ilə 100% status pariteti; ictimai girişdə etibarsız/keçmiş token ilə 200 `heldByMe = false`)
+- [x] `HoldCleanupService` (`BackgroundService`, hər 30 san, vaxtı keçmişləri `ExecuteDeleteAsync` ilə silir, hər iterasiya `try/catch` ilə təcrid edilib, `Hold:CleanupEnabled` konfiqurasiyası)
+- [x] Testlər: 20 dövr paralel inteqrasiya testi (start gate ilə hər dövr dəqiq bir 200 və bir 409, bazada 1 sətir), vaxtı bitmiş hold götürülür (`MutableTimeProvider` 10 dəq irəli), rollback köhnə hold-ları saxlayır, başqa təyyarə 400, biletli yer 409, axtarış boş yer sayı = xəritədə Available + Held (250/250 test yaşıl)
+**Commit-lər:** `57f7835`, `461b4bf`, `eb9000f`, `7e8def9`, `00971e8`, `68207c9`, `eddef51`
 **Bitmə meyarı:** iki hesabla eyni yeri kilidləməyə çalışanda biri 409 alır, vaxt bitəndə yer azad olur, restart kilidləri silmir.
 
 ### Gün 15: PNR və checkout validatoru
