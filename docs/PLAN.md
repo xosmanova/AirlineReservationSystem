@@ -128,10 +128,10 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 15: PNR və checkout validatoru
 **Branch:** `feat/pnr-and-checkout-validation`
-- [ ] `PnrGenerator` (`RandomNumberGenerator`, 6 simvol, `0/O/1/I` yoxdur); unikal pozuntusunda təkrar cəhd
-- [ ] `CheckoutCommandValidator`: sərnişin sayı = hold edilmiş yer sayı, 1-9, hər sərnişin üçün ad (`\p{L}`), pasport, doğum tarixi, əlaqə (email, telefon), kart sahələrinin formatı; reys gələcəkdədir və ləğv olunmayıb
-- [ ] Testlər: PNR formatı və icazəli simvollar, validator halları (Azərbaycan adları daxil)
-**Commit-lər:** `feat(bookings): add pnr generator`, `feat(bookings): add checkout command validator`, `test(bookings): cover pnr and checkout validation`
+- [x] `PnrGenerator` (`RandomNumberGenerator.GetItems`, 6 simvol, 32-lik əlifba, `0/O/1/I` yoxdur); pure, testable, DI qeydiyyatı
+- [x] `CheckoutCommandValidator`: sərnişin sayı 1-9, unikal oturacaqlar, `PassengerValidator` təkrar istifadəsi (`\p{L}` Azərbaycan adları: Əli, Nərgiz, Şükür), pasport, `IBusinessTime` ilə doğum tarixi, əlaqə (email, telefon), kart təhlükəsizliyi (maskalanmış ToString, echo qadağası, MM/YY cari aydan əvvəl olmamaq, CVV 3-4 rəqəm)
+- [x] Testlər: 100 000 PNR nümunəlik test, icazəli simvollar və format, kart maskalama testləri, validator halları (298/298 test yaşıl)
+**Commit-lər:** `5d6e197`, `bf2bd54`
 **Bitmə meyarı:** testlər yaşıldır.
 
 ### Gün 16: Checkout mühərriki (ən kritik gün)
