@@ -3,6 +3,7 @@ using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Application.DTOs.Seat;
+using AirlineReservation.Application.Features.Seats.Common;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
 using MediatR;
@@ -16,11 +17,16 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPricingService _pricingService;
+    private readonly TimeProvider _timeProvider;
 
-    public GetFlightSeatMapQueryHandler(IUnitOfWork unitOfWork, IPricingService pricingService)
+    public GetFlightSeatMapQueryHandler(
+        IUnitOfWork unitOfWork,
+        IPricingService pricingService,
+        TimeProvider? timeProvider = null)
     {
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _pricingService = pricingService ?? throw new ArgumentNullException(nameof(pricingService));
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<ApiResponse<SeatMapDto>> Handle(GetFlightSeatMapQuery request, CancellationToken cancellationToken)
@@ -36,31 +42,40 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             throw new NotFoundException($"Aircraft or seat layout for flight {request.FlightId} was not found.");
         }
 
-        // Map pre-projected seats with SQL-evaluated occupied IDs.
-        // Held/HeldByMe become active in Day 14 (SeatHold) and Blocked in Day 31 (FlightSeatBlock).
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var activeHolds = await _unitOfWork.SeatHolds.GetActiveHoldsByFlightIdAsync(request.FlightId, utcNow, cancellationToken);
+        var activeHoldsBySeatId = activeHolds.ToDictionary(h => h.SeatId);
+
+        // Map pre-projected seats with unified SeatStatusResolver.
+        // Status precedence: Blocked > Occupied > Held > Available.
         var seats = seatMapData.Seats
             .OrderBy(s => s.RowNumber)
             .ThenBy(s => s.ColumnLetter)
-            .Select(s => new SeatDto
+            .Select(s =>
             {
-                Id = s.Id,
-                AircraftId = s.AircraftId,
-                SeatNumber = s.SeatNumber,
-                RowNumber = s.RowNumber,
-                ColumnLetter = s.ColumnLetter,
-                SeatClass = s.SeatClass,
-                BasePriceMultiplier = s.BasePriceMultiplier,
-                Price = _pricingService.CalculateSeatPrice(new SeatPricingInput(
-                    seatMapData.BasePrice,
-                    s.BasePriceMultiplier,
-                    s.IsWindow,
-                    s.IsAisle,
-                    seatMapData.DepartureTimeUtc)).FinalPrice,
-                Status = seatMapData.OccupiedSeatIds.Contains(s.Id) ? SeatStatus.Occupied : SeatStatus.Available,
-                HeldByMe = false,
-                IsWindow = s.IsWindow,
-                IsAisle = s.IsAisle,
-                IsExitRow = s.IsExitRow
+                var resolved = SeatStatusResolver.Resolve(s.Id, seatMapData.OccupiedSeatIds, activeHoldsBySeatId, request.UserId);
+
+                return new SeatDto
+                {
+                    Id = s.Id,
+                    AircraftId = s.AircraftId,
+                    SeatNumber = s.SeatNumber,
+                    RowNumber = s.RowNumber,
+                    ColumnLetter = s.ColumnLetter,
+                    SeatClass = s.SeatClass,
+                    BasePriceMultiplier = s.BasePriceMultiplier,
+                    Price = _pricingService.CalculateSeatPrice(new SeatPricingInput(
+                        seatMapData.BasePrice,
+                        s.BasePriceMultiplier,
+                        s.IsWindow,
+                        s.IsAisle,
+                        seatMapData.DepartureTimeUtc)).FinalPrice,
+                    Status = resolved.Status,
+                    HeldByMe = resolved.HeldByMe,
+                    IsWindow = s.IsWindow,
+                    IsAisle = s.IsAisle,
+                    IsExitRow = s.IsExitRow
+                };
             })
             .ToList();
 
@@ -78,6 +93,7 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             .ToList();
 
         int totalSeats = seats.Count;
+        int heldCount = seats.Count(s => s.Status == SeatStatus.Held);
         int occupiedCount = seats.Count(s => s.Status != SeatStatus.Available);
         int availableCount = Math.Max(0, totalSeats - occupiedCount);
 
@@ -90,6 +106,7 @@ public class GetFlightSeatMapQueryHandler : IRequestHandler<GetFlightSeatMapQuer
             TotalSeats = totalSeats,
             AvailableSeatsCount = availableCount,
             OccupiedSeatsCount = occupiedCount,
+            HeldSeatsCount = heldCount,
             BasePrice = seatMapData.BasePrice,
             Rows = rows
         };

@@ -24,6 +24,7 @@ public static class ApplicationServiceRegistration
         // Register default TimeProvider
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(new PricingSettings());
+        services.TryAddSingleton(new HoldSettings());
         services.TryAddSingleton<IPricingService, PricingService>();
 
         // Register IBusinessTime for unified timezone-aware day boundary calculations

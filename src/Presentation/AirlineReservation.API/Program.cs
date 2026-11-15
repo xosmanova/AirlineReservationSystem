@@ -44,6 +44,14 @@ builder.Services.AddOptions<PricingSettings>()
     .ValidateOnStart();
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<PricingSettings>>().Value);
 
+builder.Services.AddOptions<HoldSettings>()
+    .Bind(builder.Configuration.GetSection(HoldSettings.SectionName))
+    .Validate(
+        settings => settings.IsValid(out _),
+        "Invalid Hold configuration: Minutes and CleanupSeconds must be > 0.")
+    .ValidateOnStart();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<HoldSettings>>().Value);
+
 // Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddJwtAuthentication();

@@ -12,6 +12,7 @@ public class SeatMapDto
     public int TotalSeats { get; set; }
     public int AvailableSeatsCount { get; set; }
     public int OccupiedSeatsCount { get; set; }
+    public int HeldSeatsCount { get; set; }
     public decimal BasePrice { get; set; }
     public IReadOnlyList<SeatRowDto> Rows { get; set; } = [];
 }

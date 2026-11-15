@@ -141,10 +141,12 @@ public class GetFlightSeatMapQueryHandlerTests
         public ISeatRepository Seats => throw new NotImplementedException();
         public IAirportRepository Airports => throw new NotImplementedException();
         public IAirlineRepository Airlines => throw new NotImplementedException();
+        public ISeatHoldRepository SeatHolds { get; }
 
-        public FakeUnitOfWork(IFlightRepository flightRepository)
+        public FakeUnitOfWork(IFlightRepository flightRepository, ISeatHoldRepository? seatHolds = null)
         {
             Flights = flightRepository;
+            SeatHolds = seatHolds ?? new FakeSeatHoldRepository();
         }
 
         public IGenericRepository<T> Repository<T>() where T : BaseEntity => throw new NotImplementedException();
@@ -231,6 +233,34 @@ public class GetFlightSeatMapQueryHandlerTests
         public void SoftDelete(Flight entity) { }
         public Task<bool> ExistsAsync(int id, CancellationToken ct = default) => Task.FromResult(_flight != null);
         public Task<int> CountAsync(Expression<Func<Flight, bool>>? p = null, CancellationToken ct = default) => Task.FromResult(_flight != null ? 1 : 0);
+    }
+
+    private sealed class FakeSeatHoldRepository : ISeatHoldRepository
+    {
+        private readonly IReadOnlyList<SeatHold> _holds;
+
+        public FakeSeatHoldRepository(IEnumerable<SeatHold>? holds = null)
+        {
+            _holds = holds?.ToList() ?? new List<SeatHold>();
+        }
+
+        public Task<IReadOnlyList<SeatHold>> GetActiveHoldsByFlightIdAsync(int flightId, DateTime utcNow, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SeatHold>>(_holds.Where(h => h.FlightId == flightId && h.ExpiresAtUtc > utcNow).ToList());
+
+        public Task<IReadOnlyList<SeatHold>> GetUserActiveHoldsForFlightAsync(int flightId, Guid userId, DateTime utcNow, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SeatHold>>(_holds.Where(h => h.FlightId == flightId && h.UserId == userId && h.ExpiresAtUtc > utcNow).ToList());
+
+        public Task<IReadOnlyList<SeatHold>> GetUserActiveHoldsAsync(Guid userId, DateTime utcNow, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SeatHold>>(_holds.Where(h => h.UserId == userId && h.ExpiresAtUtc > utcNow).ToList());
+
+        public Task<IReadOnlySet<int>> GetActiveHeldSeatIdsForFlightAsync(int flightId, DateTime utcNow, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlySet<int>>(_holds.Where(h => h.FlightId == flightId && h.ExpiresAtUtc > utcNow).Select(h => h.SeatId).ToHashSet());
+
+        public Task<int> ReleaseUserHoldsForFlightAsync(int flightId, Guid userId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> ReleaseOtherFlightHoldsForUserAsync(int currentFlightId, Guid userId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteExpiredHoldsForSeatsAsync(int flightId, IReadOnlyCollection<int> seatIds, DateTime utcNow, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteAllExpiredHoldsAsync(DateTime utcNow, CancellationToken ct = default) => Task.FromResult(0);
+        public Task AddRangeAsync(IEnumerable<SeatHold> holds, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     #endregion

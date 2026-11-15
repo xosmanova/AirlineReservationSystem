@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Domain.Common;
 using AirlineReservation.Infrastructure.Context;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AirlineReservation.Infrastructure.Repositories;
@@ -19,6 +22,7 @@ public class UnitOfWork : IUnitOfWork
     private ISeatRepository? _seats;
     private IAirportRepository? _airports;
     private IAirlineRepository? _airlines;
+    private ISeatHoldRepository? _seatHolds;
     private IDbContextTransaction? _transaction;
     private bool _disposed;
 
@@ -32,6 +36,7 @@ public class UnitOfWork : IUnitOfWork
     public ISeatRepository Seats => _seats ??= new SeatRepository(_context);
     public IAirportRepository Airports => _airports ??= new AirportRepository(_context);
     public IAirlineRepository Airlines => _airlines ??= new AirlineRepository(_context);
+    public ISeatHoldRepository SeatHolds => _seatHolds ??= new SeatHoldRepository(_context);
 
     public IGenericRepository<T> Repository<T>() where T : BaseEntity
     {
@@ -42,7 +47,14 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UniqueConstraintViolationException("A unique constraint or unique index was violated.", ex);
+        }
     }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -66,6 +78,11 @@ public class UnitOfWork : IUnitOfWork
                 await _transaction.CommitAsync(cancellationToken);
             }
         }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            await RollbackTransactionAsync(cancellationToken);
+            throw new UniqueConstraintViolationException("A unique constraint or unique index was violated during transaction commit.", ex);
+        }
         catch
         {
             await RollbackTransactionAsync(cancellationToken);
@@ -79,6 +96,22 @@ public class UnitOfWork : IUnitOfWork
                 _transaction = null;
             }
         }
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        var current = ex.InnerException;
+        while (current != null)
+        {
+            if (current is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                return true;
+            }
+
+            current = current.InnerException;
+        }
+
+        return false;
     }
 
     public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)

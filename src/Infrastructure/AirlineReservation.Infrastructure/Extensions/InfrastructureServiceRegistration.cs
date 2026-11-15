@@ -1,6 +1,7 @@
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.Contracts.Identity;
 using AirlineReservation.Application.Contracts.Persistence;
+using AirlineReservation.Infrastructure.BackgroundServices;
 using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Identity.Entities;
 using AirlineReservation.Infrastructure.Identity.Services;
@@ -50,6 +51,9 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IAirportRepository, AirportRepository>();
         services.AddScoped<IAirlineRepository, AirlineRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddSingleton<HoldCleanupService>();
+        services.AddHostedService(sp => sp.GetRequiredService<HoldCleanupService>());
 
         return services;
     }
