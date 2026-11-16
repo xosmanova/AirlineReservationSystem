@@ -126,12 +126,12 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Commit-lər:** `57f7835`, `461b4bf`, `eb9000f`, `7e8def9`, `00971e8`, `68207c9`, `eddef51`
 **Bitmə meyarı:** iki hesabla eyni yeri kilidləməyə çalışanda biri 409 alır, vaxt bitəndə yer azad olur, restart kilidləri silmir.
 
-### Gün 15: PNR və checkout validatoru
+### Gün 15: PNR və checkout validatoru (TAMAMLANDI)
 **Branch:** `feat/pnr-and-checkout-validation`
-- [ ] `PnrGenerator` (`RandomNumberGenerator`, 6 simvol, `0/O/1/I` yoxdur); unikal pozuntusunda təkrar cəhd
-- [ ] `CheckoutCommandValidator`: sərnişin sayı = hold edilmiş yer sayı, 1-9, hər sərnişin üçün ad (`\p{L}`), pasport, doğum tarixi, əlaqə (email, telefon), kart sahələrinin formatı; reys gələcəkdədir və ləğv olunmayıb
-- [ ] Testlər: PNR formatı və icazəli simvollar, validator halları (Azərbaycan adları daxil)
-**Commit-lər:** `feat(bookings): add pnr generator`, `feat(bookings): add checkout command validator`, `test(bookings): cover pnr and checkout validation`
+- [x] `PnrGenerator` (`RandomNumberGenerator.GetItems`, 6 simvol, 32-lik əlifba, `0/O/1/I` yoxdur); pure, testable, DI qeydiyyatı
+- [x] `CheckoutCommandValidator`: sərnişin sayı 1-9, unikal oturacaqlar, `PassengerValidator` təkrar istifadəsi (`\p{L}` Azərbaycan adları: Əli, Nərgiz, Şükür), pasport, `IBusinessTime` ilə doğum tarixi, əlaqə (email, telefon), kart təhlükəsizliyi (maskalanmış ToString, echo qadağası, MM/YY cari aydan əvvəl olmamaq, CVV 3-4 rəqəm, bütün mətn sahələrinə MaximumLength limitləri)
+- [x] Testlər: 100 000 PNR nümunəlik test, icazəli simvollar və format, kart maskalama testləri, MaximumLength və validator halları (302/302 test yaşıl)
+**Commit-lər:** `5d6e197`, `bf2bd54`, `d71253e`
 **Bitmə meyarı:** testlər yaşıldır.
 
 ### Gün 16: Checkout mühərriki (ən kritik gün)
@@ -140,7 +140,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [ ] Unikal indeks pozuntusu → 409. PNR toqquşması → təkrar cəhd
 - [ ] `POST /api/v1/bookings/checkout` `[Authorize]`
 - [ ] Hold-u olmayan və ya başqasının hold-u ilə checkout rədd edilir
-- [ ] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdursa rədd; vaxtı bitmiş hold ilə rədd; uğurlu checkout biletləri və PNR yaradır, hold-lar silinir; **paralel iki checkout eyni oturacaq üçün yalnız biri uğurlu**
+- [ ] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdursa rədd; vaxtı bitmiş hold ilə rədd; uğurlu checkout biletləri və PNR yaradır, hold-lar silinir; **paralel iki checkout eyni oturacaq üçün yalnız biri uğurlu**; 400 cavab gövdəsində və test logger çıxışında kart nömrəsi və CVV axtarışı (AttemptedValue sızmaması yoxlanışı)
 **Commit-lər:** `feat(bookings): add checkout command consuming seat holds`, `fix(bookings): reject expired or foreign holds`, `feat(api): add checkout endpoint`, `test(bookings): add checkout integration and concurrency tests`
 **Bitmə meyarı:** Scalar-da hold → checkout → PNR işləyir, paralel test keçir.
 
