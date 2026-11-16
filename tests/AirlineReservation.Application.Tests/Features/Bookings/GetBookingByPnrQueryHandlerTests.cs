@@ -101,6 +101,8 @@ public class GetBookingByPnrQueryHandlerTests
 
     private sealed class FakeBookingRepository(Booking? booking) : IBookingRepository
     {
+        public Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken ct = default) => throw new NotImplementedException();
+
         public Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken ct = default)
         {
             if (booking != null && string.Equals(booking.PnrCode, pnrCode, StringComparison.OrdinalIgnoreCase))

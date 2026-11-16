@@ -78,6 +78,7 @@ public class GetMyBookingsQueryHandlerTests
             return Task.FromResult<IReadOnlyList<Booking>>(userBookings);
         }
 
+        public Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> PnrExistsAsync(string pnrCode, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Booking>> GetAllWithDetailsAsync(CancellationToken ct = default) => throw new NotImplementedException();

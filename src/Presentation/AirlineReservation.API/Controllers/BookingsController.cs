@@ -3,7 +3,9 @@ using System.Security.Claims;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Booking;
+using AirlineReservation.Application.Features.Bookings.Commands.CancelBooking;
 using AirlineReservation.Application.Features.Bookings.Commands.Checkout;
+using AirlineReservation.Application.Features.Bookings.Queries.CancelBookingPreview;
 using AirlineReservation.Application.Features.Bookings.Queries.GetBookingByPnr;
 using AirlineReservation.Application.Features.Bookings.Queries.GetBookingQuote;
 using AirlineReservation.Application.Features.Bookings.Queries.GetMyBookings;
@@ -125,5 +127,65 @@ public class BookingsController : BaseApiController
             cancellationToken);
 
         return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Previews the cancellation terms, refund amount, and penalty for a specific booking.
+    /// Only the booking owner or an administrator can view this preview.
+    /// </summary>
+    /// <param name="id">Booking primary identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Standardized ApiResponse containing previewed refund calculation.</returns>
+    [HttpGet("{id:int}/cancel-preview")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<CancelBookingPreviewDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelPreview(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var (userId, isAdmin) = GetCurrentUserContext();
+        var result = await Mediator.Send(new CancelBookingPreviewQuery(id, userId, isAdmin), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Cancels a confirmed booking, marks tickets as cancelled to liberate seats, refunds payment
+    /// according to policy rules, and records cancellation audit data in an ACID transaction.
+    /// </summary>
+    /// <param name="id">Booking primary identifier to cancel.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Standardized ApiResponse containing the updated booking status and refund details.</returns>
+    [HttpPost("{id:int}/cancel")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<BookingDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Cancel(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var (userId, isAdmin) = GetCurrentUserContext();
+        var result = await Mediator.Send(new CancelBookingCommand(id, userId, isAdmin), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    private (Guid UserId, bool IsAdmin) GetCurrentUserContext()
+    {
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                          ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedException("Invalid or missing user identity in access token.");
+        }
+
+        var isAdmin = User.IsInRole("Admin") || User.HasClaim(c => c.Type == "role" && c.Value == "Admin");
+        return (userId, isAdmin);
     }
 }
