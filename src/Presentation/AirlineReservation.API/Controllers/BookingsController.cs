@@ -4,14 +4,16 @@ using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Booking;
 using AirlineReservation.Application.Features.Bookings.Commands.Checkout;
+using AirlineReservation.Application.Features.Bookings.Queries.GetBookingByPnr;
 using AirlineReservation.Application.Features.Bookings.Queries.GetBookingQuote;
+using AirlineReservation.Application.Features.Bookings.Queries.GetMyBookings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AirlineReservation.API.Controllers;
 
 /// <summary>
-/// Booking pricing quote and reservation endpoints.
+/// Booking pricing quote, checkout, PNR lookup, and itinerary management endpoints.
 /// </summary>
 public class BookingsController : BaseApiController
 {
@@ -66,6 +68,62 @@ public class BookingsController : BaseApiController
 
         command.UserId = userId;
         var result = await Mediator.Send(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Retrieves booking details by 6-character PNR code and passenger last name.
+    /// Accessible anonymously so passengers can look up their itinerary without logging in.
+    /// </summary>
+    /// <param name="pnr">6-character alphanumeric PNR code.</param>
+    /// <param name="lastName">Passenger's last name for identity confirmation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Standardized ApiResponse containing confirmed itinerary and ticket details.</returns>
+    [HttpGet("pnr/{pnr}")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(ApiResponse<BookingDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByPnr(
+        string pnr,
+        [FromQuery] string lastName,
+        CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetBookingByPnrQuery(pnr, lastName), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    /// <summary>
+    /// Retrieves a paginated list of bookings for the authenticated user, optionally filtered by status.
+    /// </summary>
+    /// <param name="status">Optional status filter: 'upcoming', 'past', or 'cancelled'.</param>
+    /// <param name="pageNumber">Page index (1-based, default 1).</param>
+    /// <param name="pageSize">Items per page (default 10, max 50).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Standardized ApiResponse containing paginated list of user booking summaries.</returns>
+    [HttpGet("my")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<BookingDetailsDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyBookings(
+        [FromQuery] string? status,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var userIdClaim = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                          ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new UnauthorizedException("Invalid or missing user identity in access token.");
+        }
+
+        var result = await Mediator.Send(
+            new GetMyBookingsQuery(userId, status, pageNumber, pageSize),
+            cancellationToken);
+
         return StatusCode(result.StatusCode, result);
     }
 }
