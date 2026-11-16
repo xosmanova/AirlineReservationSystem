@@ -35,15 +35,20 @@ public class PassengerValidator : AbstractValidator<PassengerCreateDto>
         RuleFor(x => x.PassportNumber)
             .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Passport number is required.")
+            .MaximumLength(30).WithMessage("Passport number cannot exceed 30 characters.")
             .Must(p => !string.IsNullOrWhiteSpace(p) && PassportRegex.IsMatch(p.Trim()))
             .WithMessage("Passport number must be 6 to 12 alphanumeric characters.");
 
         RuleFor(x => x.Email)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Email address is required.")
+            .MaximumLength(256).WithMessage("Email cannot exceed 256 characters.")
             .EmailAddress().WithMessage("A valid email address is required.");
 
         RuleFor(x => x.PhoneNumber)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Phone number is required.")
+            .MaximumLength(20).WithMessage("Phone number cannot exceed 20 characters.")
             .Must(phone => !string.IsNullOrWhiteSpace(phone) && PhoneRegex.IsMatch(phone))
             .WithMessage("A valid contact phone number is required.");
 

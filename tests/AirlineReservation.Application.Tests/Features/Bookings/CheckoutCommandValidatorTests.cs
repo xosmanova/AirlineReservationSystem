@@ -395,4 +395,76 @@ public class CheckoutCommandValidatorTests
             Assert.DoesNotContain(invalidCvv, error.ErrorMessage);
         }
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_CardHolderName_Empty_ShouldFail(string emptyName)
+    {
+        var command = CreateValidCommand();
+        command.Card.CardHolderName = emptyName;
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName.Contains("CardHolderName"));
+    }
+
+    [Fact]
+    public void Validate_CardHolderName_Exceeds100Characters_ShouldFail()
+    {
+        var command = CreateValidCommand();
+        command.Card.CardHolderName = new string('A', 101);
+
+        var result = _validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName.Contains("CardHolderName") && e.ErrorMessage.Contains("100 characters"));
+    }
+
+    [Fact]
+    public void Validate_StringProperties_ExceedingMaximumLength_ShouldFail()
+    {
+        // 1. Passport > 12 chars
+        var cmdPassport = CreateValidCommand();
+        cmdPassport.Passengers[0].PassportNumber = "AZE1234567890"; // 13 chars
+        var resPassport = _validator.Validate(cmdPassport);
+        Assert.False(resPassport.IsValid);
+        Assert.Contains(resPassport.Errors, e => e.PropertyName.Contains("PassportNumber"));
+
+        // 2. Email > 256 chars
+        var cmdEmail = CreateValidCommand();
+        cmdEmail.Contact.Email = new string('a', 250) + "@domain.com"; // > 256 chars
+        var resEmail = _validator.Validate(cmdEmail);
+        Assert.False(resEmail.IsValid);
+        Assert.Contains(resEmail.Errors, e => e.PropertyName.Contains("Email"));
+
+        // 3. Phone > 20 chars
+        var cmdPhone = CreateValidCommand();
+        cmdPhone.Contact.PhoneNumber = "+994501234567890123456"; // 22 chars
+        var resPhone = _validator.Validate(cmdPhone);
+        Assert.False(resPhone.IsValid);
+        Assert.Contains(resPhone.Errors, e => e.PropertyName.Contains("PhoneNumber"));
+
+        // 4. Card number > 25 chars
+        var cmdCard = CreateValidCommand();
+        cmdCard.Card.CardNumber = new string('4', 26);
+        var resCard = _validator.Validate(cmdCard);
+        Assert.False(resCard.IsValid);
+        Assert.Contains(resCard.Errors, e => e.PropertyName.Contains("CardNumber"));
+
+        // 5. CVV > 4 chars
+        var cmdCvv = CreateValidCommand();
+        cmdCvv.Card.Cvv = "12345";
+        var resCvv = _validator.Validate(cmdCvv);
+        Assert.False(resCvv.IsValid);
+        Assert.Contains(resCvv.Errors, e => e.PropertyName.Contains("Cvv"));
+
+        // 6. Expiry > 5 chars
+        var cmdExpiry = CreateValidCommand();
+        cmdExpiry.Card.ExpiryMonthYear = "11/2026";
+        var resExpiry = _validator.Validate(cmdExpiry);
+        Assert.False(resExpiry.IsValid);
+        Assert.Contains(resExpiry.Errors, e => e.PropertyName.Contains("ExpiryMonthYear"));
+    }
 }

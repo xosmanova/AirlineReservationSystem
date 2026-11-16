@@ -78,11 +78,15 @@ public class CheckoutCommandValidator : AbstractValidator<CheckoutCommand>
         When(x => x.Contact != null, () =>
         {
             RuleFor(x => x.Contact.Email)
+                .Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Contact email is required.")
+                .MaximumLength(256).WithMessage("Contact email cannot exceed 256 characters.")
                 .EmailAddress().WithMessage("A valid contact email address is required.");
 
             RuleFor(x => x.Contact.PhoneNumber)
+                .Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Contact phone number is required.")
+                .MaximumLength(20).WithMessage("Contact phone number cannot exceed 20 characters.")
                 .Must(phone => !string.IsNullOrWhiteSpace(phone) && PhoneRegex.IsMatch(phone))
                 .WithMessage("A valid contact phone number is required.");
         });
@@ -95,6 +99,7 @@ public class CheckoutCommandValidator : AbstractValidator<CheckoutCommand>
             RuleFor(x => x.Card.CardNumber)
                 .Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Card number is required.")
+                .MaximumLength(25).WithMessage("Card number cannot exceed 25 characters.")
                 .Must(cn =>
                 {
                     if (string.IsNullOrWhiteSpace(cn)) return false;
@@ -110,12 +115,14 @@ public class CheckoutCommandValidator : AbstractValidator<CheckoutCommand>
             RuleFor(x => x.Card.Cvv)
                 .Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("CVV is required.")
+                .MaximumLength(4).WithMessage("CVV cannot exceed 4 characters.")
                 .Must(cvv => !string.IsNullOrWhiteSpace(cvv) && (cvv.Length == 3 || cvv.Length == 4) && cvv.All(char.IsDigit))
                 .WithMessage("CVV must be 3 or 4 digits.");
 
             RuleFor(x => x.Card.ExpiryMonthYear)
                 .Cascade(CascadeMode.Stop)
                 .NotEmpty().WithMessage("Card expiry date is required.")
+                .MaximumLength(5).WithMessage("Card expiry date must be in MM/YY format.")
                 .Must(expiry => !string.IsNullOrWhiteSpace(expiry) && ExpiryRegex.IsMatch(expiry))
                 .WithMessage("Card expiry date must be in MM/YY format.")
                 .Must(expiry => IsExpiryValid(expiry, _businessTime))
