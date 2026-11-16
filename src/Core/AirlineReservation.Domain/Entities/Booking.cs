@@ -15,6 +15,8 @@ public class Booking : BaseEntity
     public string ContactPhone { get; set; } = string.Empty;
 
     public DateTime? ExpiresAtUtc { get; set; }        // 10-minute temporary seat reservation expiry
+    public decimal? RefundAmount { get; set; }         // Calculated refund amount upon cancellation
+    public DateTime? CancelledAtUtc { get; set; }      // Timestamp when the booking was cancelled
 
     // Navigation properties
     public ICollection<Ticket> Tickets { get; set; } = [];

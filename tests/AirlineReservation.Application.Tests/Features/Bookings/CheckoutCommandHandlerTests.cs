@@ -250,6 +250,7 @@ public class CheckoutCommandHandlerTests
             return Task.FromResult(entity);
         }
 
+        public Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(Guid userId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Booking>> GetAllWithDetailsAsync(CancellationToken ct = default) => throw new NotImplementedException();

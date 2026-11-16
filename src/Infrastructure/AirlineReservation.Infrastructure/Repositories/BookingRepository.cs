@@ -14,6 +14,33 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
     {
     }
 
+    public async Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .Include(b => b.Payment)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.DepartureAirport)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.ArrivalAirport)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.Airline)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Seat)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Passenger)
+            .Where(b => b.Id == id);
+
+        if (!trackChanges)
+        {
+            query = query.AsNoTracking();
+        }
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken cancellationToken = default)
     {
         var normalizedPnr = pnrCode.Trim().ToUpper();
@@ -49,6 +76,10 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
             .Include(b => b.Tickets)
                 .ThenInclude(t => t.Flight)
                     .ThenInclude(f => f.Airline)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Seat)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Passenger)
             .Where(b => b.UserId == userId)
             .OrderByDescending(b => b.CreatedAt)
             .AsNoTracking()
