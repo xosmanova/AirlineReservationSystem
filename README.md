@@ -51,6 +51,14 @@ Layihədə istifadə olunan bütün uçuş, təyyarə və oturacaq məlumatları
 
 ---
 
+### Ödəniş Sistemi və Simulyasiya Şlüzü (Payment Gateway Architecture)
+* **IPaymentGateway & MockPaymentGateway:** Ödəniş prosesi `IPaymentGateway` interfeysi ilə tam abstraksiya edilmişdir. İnkişaf və test mühitində real bank inteqrasiyaları `MockPaymentGateway` vasitəsilə simulyasiya olunur.
+* **Luhn Alqoritmi (Mod 10):** Bütün daxil edilən kartların nömrələri riyazi Luhn yoxlanışından keçir.
+* **PCI DSS Uyğunluğu:** Kart məlumatları (PAN və CVV) verilənlər bazasında ƏSLA saxlanılmır, log fayllarına yazılmır və HTTP xəta cavablarında heç bir halda əks olunmur (redacted).
+* **Memarlıq Qeydi (Real Dünya vs Simulyasiya):** İstehsalat (production) mühitində ödəniş şlüzləri (məsələn: Stripe, Adyen, Kapital Bank) xarici şəbəkə zəngidir. Onlar iki fazalı ödəniş (Authorize & Capture), idempotency açarları və asinxron webhook-lar vasitəsilə verilənlər bazası tranzaksiyasından kənarda idarə olunur. Bu tədris/nümayiş layihəsində isə deterministik testlər üçün proses MockPaymentGateway ilə sinxron simulyasiya edilmişdir.
+
+---
+
 ### Baza Miqrasiyaları Qaydası (Migration Workflow)
 Model dəyişikliklərinin miqrasiya snapshot-u ilə tam sinxron olduğunu yoxlamaq üçün (mütləq exit code 0 qaytarmalıdır):
 ```powershell
