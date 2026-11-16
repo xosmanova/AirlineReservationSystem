@@ -156,10 +156,10 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 18: Rezervasiya sorğuları və ləğv
 **Branch:** `feat/bookings-queries-cancel`
-- [ ] `GET /api/v1/bookings/pnr/{pnr}?lastName=` `[AllowAnonymous]` (yalnız baxış), `GET /api/v1/bookings/my?status=upcoming|past|cancelled` (səhifəli)
-- [ ] `CancellationPolicy`: uçuşdan >24 saat qalıb 100%, ≤24 saat 50%, uçuş başlayıbsa ləğv yoxdur. `Booking.RefundAmount`, `CancelledAtUtc` + migration
-- [ ] `GET .../cancel-preview`, `POST .../cancel` (sahiblik yoxlaması: yalnız öz rezervasiyası; admin hamısı). Ləğv: `Booking = Cancelled`, biletlər `IsCancelled`, `Payment = Refunded`
-- [ ] Testlər: siyasət sərhədləri (tam 24 saat), başqasının rezervasiyasını ləğv cəhdi (403)
+- [x] `GET /api/v1/bookings/pnr/{pnr}?lastName=` `[AllowAnonymous]` (yalnız baxış), `GET /api/v1/bookings/my?status=upcoming|past|cancelled` (səhifəli)
+- [x] `CancellationPolicy`: uçuşdan >24 saat qalıb 100%, ≤24 saat 50%, uçuş başlayıbsa ləğv yoxdur. `Booking.RefundAmount`, `CancelledAtUtc` + migration
+- [x] `GET .../cancel-preview`, `POST .../cancel` (sahiblik yoxlaması: yalnız öz rezervasiyası; admin hamısı). Ləğv: `Booking = Cancelled`, biletlər `IsCancelled`, `Payment = Refunded`
+- [x] Testlər: siyasət sərhədləri (tam 24 saat), başqasının rezervasiyasını ləğv cəhdi (403)
 **Commit-lər:** `feat(bookings): add pnr lookup and my trips queries`, `feat(bookings): add cancellation policy with refund amount`, `feat(bookings): add cancel and cancel preview endpoints`, `test(bookings): cover cancellation boundaries and ownership`
 **Bitmə meyarı:** ləğvdən sonra oturacaq xəritədə boşdur, qaytarma məbləği düzgündür.
 

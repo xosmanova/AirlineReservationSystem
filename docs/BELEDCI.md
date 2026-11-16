@@ -251,3 +251,23 @@ Gün 16 layihənin ən mühüm və məsuliyyətli hissəsidir. `CheckoutCommand`
 3. **Hold-un Qorunması və Təkrar Cəhd:** Ödəniş rədd edildikdə verilənlər bazası tranzaksiyası dərhal rollback olunur və müştərinin `SeatHold`-u **silinmir** (qorunur). Müştəri həmin 10 dəqiqəlik pəncərə daxilində dərhal başqa kartla təkrar cəhd edərək biletini uğurla ala bilir.
 4. **PCI DSS Təhlükəsizlik:** Kart nömrəsi və CVV bazada saxlanılmır, log fayllarına yazılmır və HTTP xəta cavablarında heç vaxt görünmür.
 5. **Real Dünya Fərqi (Enterprise Architecture):** Real istehsalat mühitində (Stripe, Adyen və s.) ödəniş xarici HTTP zəngidir və lokal DB tranzaksiyası daxilində aparılmır. Əvəzində 2-fazalı ödəniş (Authorize & Capture), İdempotency Keys (təkrar ödənişin qarşısı) və asinxron Webhook bildirişləri istifadə olunur. Layihədə isə bu proses etibarlı və qapalı test mühiti üçün simulyasiya edilmişdir.
+
+### Sual 14: Gün 18-də rezervasiya sorğuları və ləğvetmə siyasəti (Cancellation Policy) necə quruldu və yerlərin təkrar azad olması necə təmin edilir?
+**Cavab:**
+1. **PNR və Səyahət Sorğuları:**
+   - `GET /api/v1/bookings/pnr/{pnr}?lastName=`: Anonim istifadəçilərə açıqdır (`AllowAnonymous`), lakin təhlükəsizlik üçün PNR ilə yanaşı biletlərdən birinin sərnişin soyadı dəqiq uyğunlaşmalıdır (uyğun gəlmədikdə `404 Not Found`).
+   - `GET /api/v1/bookings/my`: Autentifikasiyadan keçmiş müştərinin (`UserId`) səyahətlərini səhifələnmiş (`PagedResult<BookingDetailsDto>`) və `upcoming`, `past`, `cancelled` filtrləri ilə qaytarır.
+2. **Ləğvetmə Siyasəti Pillələri (`CancellationPolicyService`):**
+   - **Uçuşa 24 saatdan çox qaldıqda:** 100% qaytarılma (0 cərimə).
+   - **Uçuşa 24 saat və ya daha az qaldıqda:** 50% qaytarılma (50% cərimə, `MidpointRounding.AwayFromZero` ilə qəpik dəqiqliyi).
+   - **Uçuş vaxtı çatdıqda və ya keçdikdə:** Ləğvə icazə verilmir (`400 Bad Request`).
+3. **Sahiblik və Səlahiyyət İdarəetməsi:**
+   - Müştəri yalnız özünə aid olan bron üçün ləğv önizləməsinə (`GET /api/v1/bookings/{id}/cancel-preview`) və ləğv sorğusuna (`POST /api/v1/bookings/{id}/cancel`) müraciət edə bilər (əks halda `403 Forbidden`).
+   - `Admin` rolu istənilən istifadəçinin bronunu ləğv etmək səlahiyyətinə malikdir.
+   - Artıq ləğv edilmiş bron təkrar ləğv edilə bilməz (`400 Bad Request: Booking is already cancelled.`).
+4. **Oturacaq Yerlərinin Dərhal Azad Olması (Seat Liberation):**
+   - Ləğv zamanı vahid ACID tranzaksiya daxilində:
+     - `Booking`: `Status = Cancelled`, `RefundAmount = calc.RefundAmount`, `CancelledAtUtc = nowUtc`
+     - `Ticket`: hər bilet üçün `IsCancelled = true`, `CancelledAtUtc = nowUtc`
+     - `Payment`: `Status = Refunded`
+   - `TicketConfiguration`-da unikal filtr indeksi `[IsDeleted] = 0 AND [IsCancelled] = 0` olaraq qurulduğu üçün və `SeatRepository.GetOccupiedSeatIdsForFlightAsync` ləğv olunmuş biletləri istisna etdiyi üçün, oturacaq dərhal seat map-də `Available` olur və başqa müştərilər tərəfindən satın alına bilir.
