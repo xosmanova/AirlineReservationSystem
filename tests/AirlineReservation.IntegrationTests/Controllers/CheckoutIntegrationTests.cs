@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AirlineReservation.Application.Common.Models;
+using AirlineReservation.Application.Common.Services;
 using AirlineReservation.Application.Contracts.Identity;
 using AirlineReservation.Application.DTOs.Booking;
 using AirlineReservation.Application.DTOs.Flight;
@@ -423,5 +424,122 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
         // PCI DSS assertion: raw card number and CVV must NEVER appear in response body
         Assert.DoesNotContain(sensitiveCardNumber, rawContent);
         Assert.DoesNotContain(sensitiveCvv, rawContent);
+    }
+
+    [Fact]
+    public async Task Checkout_PaymentDeclined_InsufficientFunds_PreservesSeatHold_AndDoesNotCreateBooking()
+    {
+        var (user, token) = await CreateUserAndTokenAsync("declined_user@airline.test");
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var targetSeat = _testSeats[6];
+
+        // 1. Hold seat
+        var holdResponse = await client.PostAsJsonAsync(
+            $"/api/v1/flights/{_testFlightId}/holds",
+            new SeatHoldRequestDto([targetSeat.Id]));
+        Assert.Equal(HttpStatusCode.OK, holdResponse.StatusCode);
+
+        // 2. Checkout with Insufficient Funds test card
+        var command = CreateValidCheckoutCommand(_testFlightId, [targetSeat.Id]);
+        command.Card.CardNumber = MockPaymentGateway.InsufficientFundsTestCard;
+
+        var response = await client.PostAsJsonAsync("/api/v1/bookings/checkout", command);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.False(body.Success);
+        Assert.Contains("Insufficient funds", body.Message);
+
+        // 3. Verify Database: Booking NOT created, SeatHold PRESERVED
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var bookingCount = await db.Bookings.CountAsync(b => b.UserId == user.Id && b.ContactEmail == command.Contact.Email);
+        Assert.Equal(0, bookingCount);
+
+        var activeHold = await db.SeatHolds.FirstOrDefaultAsync(h => h.FlightId == _testFlightId && h.SeatId == targetSeat.Id && h.UserId == user.Id);
+        Assert.NotNull(activeHold);
+    }
+
+    [Fact]
+    public async Task Checkout_PaymentDeclined_ThenRetryWithValidCard_SucceedsAndConsumesHold()
+    {
+        var (user, token) = await CreateUserAndTokenAsync("retry_user@airline.test");
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var targetSeat = _testSeats[7];
+
+        // 1. Hold seat
+        var holdResponse = await client.PostAsJsonAsync(
+            $"/api/v1/flights/{_testFlightId}/holds",
+            new SeatHoldRequestDto([targetSeat.Id]));
+        Assert.Equal(HttpStatusCode.OK, holdResponse.StatusCode);
+
+        // 2. First attempt with declining card
+        var commandFail = CreateValidCheckoutCommand(_testFlightId, [targetSeat.Id]);
+        commandFail.Card.CardNumber = MockPaymentGateway.InsufficientFundsTestCard;
+
+        var responseFail = await client.PostAsJsonAsync("/api/v1/bookings/checkout", commandFail);
+        Assert.Equal(HttpStatusCode.BadRequest, responseFail.StatusCode);
+
+        // 3. Second attempt with valid card using the SAME preserved hold
+        var commandSuccess = CreateValidCheckoutCommand(_testFlightId, [targetSeat.Id]);
+        commandSuccess.Card.CardNumber = MockPaymentGateway.SuccessTestCard;
+
+        var responseSuccess = await client.PostAsJsonAsync("/api/v1/bookings/checkout", commandSuccess);
+        Assert.Equal(HttpStatusCode.OK, responseSuccess.StatusCode);
+        var bodySuccess = await responseSuccess.Content.ReadFromJsonAsync<ApiResponse<CheckoutResultDto>>(JsonOptions);
+        Assert.NotNull(bodySuccess?.Data);
+        Assert.Equal("Confirmed", bodySuccess.Data.Status);
+
+        // 4. Verify Database: Booking created, hold consumed
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var booking = await db.Bookings.Include(b => b.Tickets).FirstOrDefaultAsync(b => b.PnrCode == bodySuccess.Data.PnrCode);
+        Assert.NotNull(booking);
+        Assert.Single(booking.Tickets);
+        Assert.Equal(targetSeat.Id, booking.Tickets.First().SeatId);
+
+        var remainingHolds = await db.SeatHolds.Where(h => h.FlightId == _testFlightId && h.UserId == user.Id).ToListAsync();
+        Assert.Empty(remainingHolds);
+    }
+
+    [Fact]
+    public async Task Checkout_PaymentDeclined_LostOrStolenCard_ReturnsBadRequest_PreservesHold()
+    {
+        var (user, token) = await CreateUserAndTokenAsync("stolen_user@airline.test");
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var targetSeat = _testSeats[8];
+
+        // 1. Hold seat
+        var holdResponse = await client.PostAsJsonAsync(
+            $"/api/v1/flights/{_testFlightId}/holds",
+            new SeatHoldRequestDto([targetSeat.Id]));
+        Assert.Equal(HttpStatusCode.OK, holdResponse.StatusCode);
+
+        // 2. Checkout with lost or stolen test card
+        var command = CreateValidCheckoutCommand(_testFlightId, [targetSeat.Id]);
+        command.Card.CardNumber = MockPaymentGateway.LostOrStolenTestCard;
+
+        var response = await client.PostAsJsonAsync("/api/v1/bookings/checkout", command);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Contains("lost or stolen", body.Message);
+
+        // 3. Verify Database: Hold still preserved
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var activeHold = await db.SeatHolds.FirstOrDefaultAsync(h => h.FlightId == _testFlightId && h.SeatId == targetSeat.Id && h.UserId == user.Id);
+        Assert.NotNull(activeHold);
     }
 }
