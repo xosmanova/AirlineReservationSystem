@@ -25,6 +25,8 @@ public static class BookingMappingExtensions
             ContactEmail = booking.ContactEmail,
             ContactPhone = booking.ContactPhone,
             CreatedAtUtc = booking.CreatedAt,
+            RefundAmount = booking.RefundAmount,
+            CancelledAtUtc = booking.CancelledAtUtc,
 
             FlightId = flight?.Id ?? 0,
             FlightNumber = flight?.FlightNumber ?? string.Empty,

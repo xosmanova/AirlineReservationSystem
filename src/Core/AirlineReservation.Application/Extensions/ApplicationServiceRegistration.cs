@@ -34,6 +34,9 @@ public static class ApplicationServiceRegistration
         // Register IPnrGenerator for cryptographically secure booking references
         services.AddSingleton<IPnrGenerator, PnrGenerator>();
 
+        // Register ICancellationPolicyService for refund tier calculations
+        services.AddSingleton<ICancellationPolicyService, CancellationPolicyService>();
+
         // Register IPaymentGateway (Simulated mock gateway with Luhn and decline test cards)
         services.TryAddSingleton<IPaymentGateway, MockPaymentGateway>();
 

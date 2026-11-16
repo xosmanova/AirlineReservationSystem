@@ -23,6 +23,9 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.TotalAmount)
             .HasColumnType("decimal(18,2)");
 
+        builder.Property(b => b.RefundAmount)
+            .HasColumnType("decimal(18,2)");
+
         builder.Property(b => b.ContactEmail)
             .IsRequired()
             .HasMaxLength(100);
