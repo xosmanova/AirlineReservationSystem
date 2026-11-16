@@ -53,7 +53,7 @@ graph TD
 
 ---
 
-## 2. Gün-Gün İcra Cədvəli (Gün 1–16)
+## 2. Gün-Gün İcra Cədvəli (Gün 1–17)
 
 | Gün | Əsas Mövzu | Əsas Nəticə və Həll Olunan Problem | Əsas Fayllar və Commit-lər |
 |---|---|---|---|
@@ -73,6 +73,7 @@ graph TD
 | **Gün 14** | Verilənlər Bazası Əsaslı Oturacaq Kilidi (SeatHold) | 10 dəqiqəlik yer kilidi (`SeatHold`), unikal SQL indeksi (ikiqat hold-un qarşısı), rollback təhlükəsizliyi, `HoldCleanupService` və delta xəritə statusu endpoint-i. | `SeatHold.cs`, `CreateSeatHoldCommandHandler.cs`, `HoldCleanupService.cs` |
 | **Gün 15** | PNR Generator və Checkout Validasiyası | 32 simvollu kriptoqrafik 6 hərfli PNR (`RandomNumberGenerator.GetItems`), kart təhlükəsizliyi (maskalanmış ToString, echo qadağası), Azərbaycan adları dəstəyi. | `PnrGenerator.cs`, `CheckoutCommandValidator.cs` |
 | **Gün 16** | Checkout Mühərriki & Hold İstehlakı (F6) | Vahid ACID tranzaksiyada hold yoxlanışı, `PricingService` ilə server qiymət hesablanması, `IPaymentGateway` ödəniş, unikal PNR, biletlər (`ET-{pnr}-{seat}`), hold-ların silinməsi və paralel checkout testi. | `CheckoutCommandHandler.cs`, `BookingsController.cs`, `CheckoutIntegrationTests.cs` |
+| **Gün 17** | Ödəniş Simulyasiyası & Mock Gateway (F6) | Luhn (Mod 10) alqoritmi, kart müddəti və CVV yoxlanışı, `MockPaymentGateway`, test kartları (`4111111111111111` uğurlu, `4000000000000002` rədd), hold-un qorunması və təkrar cəhd inteqrasiyası. | `MockPaymentGateway.cs`, `MockPaymentGatewayTests.cs`, `CheckoutIntegrationTests.cs` |
 
 ---
 
@@ -238,3 +239,15 @@ Gün 16 layihənin ən mühüm və məsuliyyətli hissəsidir. `CheckoutCommand`
 7. **Qalıcı Qeydlər:** `Booking` (`Status = Confirmed`), `Ticket` (`TicketNumber = $"ET-{pnrCode}-{seatNumber}"`), `Passenger` və `Payment` (`Success`) vahid qraf olaraq əlavə edilir.
 8. **Hold-ların Silinməsi:** İstifadəçinin bu reys üzrə müvəqqəti `SeatHold` qeydləri eyni tranzaksiya daxilində bazadan silinir (`ReleaseUserHoldsForFlightAsync`).
 9. **Paralellik Qoruması (Concurrency):** Əgər eyni anda iki proses eyni oturacaq üçün bilet yazmağa çalışarsa, SQL Server `(FlightId, SeatId)` unikal filtri indeksi səviyyəsində ikinci tranzaksiya `2601/2627` xətası alır; `UnitOfWork` bunu avtomatik `UniqueConstraintViolationException`-a və nəticədə `409 Conflict`-ə çevirir. Yalnız 1 sifariş uğurlu olur (testlərlə 100% sübut olunmuşdur).
+
+### Sual 13: Gün 17-də reallaşdırılan Ödəniş Simulyasiyası (Mock Gateway) necə işləyir və real bank inteqrasiyasından fərqi nədir?
+**Cavab:**
+1. **Luhn (Mod 10) Doğrulaması:** Kart nömrələrinin düzgünlüyü riyazi olaraq `MockPaymentGateway.IsValidLuhn` ilə yoxlanılır.
+2. **Deterministik Test Kartları:**
+   - `4111 1111 1111 1111` $\rightarrow$ Həmişə uğurlu (`TXN-...` unikal referansı yaradır).
+   - `4000 0000 0000 0002` $\rightarrow$ Balans çatışmazlığı ("Insufficient funds in account").
+   - `4000 0000 0000 0010` $\rightarrow$ İtirilmiş/oğurlanmış kart ("Card reported lost or stolen").
+   - `4000 0000 0000 0028` $\rightarrow$ Fırıldaqçılıq şübhəsi ("Transaction declined due to suspected fraud").
+3. **Hold-un Qorunması və Təkrar Cəhd:** Ödəniş rədd edildikdə verilənlər bazası tranzaksiyası dərhal rollback olunur və müştərinin `SeatHold`-u **silinmir** (qorunur). Müştəri həmin 10 dəqiqəlik pəncərə daxilində dərhal başqa kartla təkrar cəhd edərək biletini uğurla ala bilir.
+4. **PCI DSS Təhlükəsizlik:** Kart nömrəsi və CVV bazada saxlanılmır, log fayllarına yazılmır və HTTP xəta cavablarında heç vaxt görünmür.
+5. **Real Dünya Fərqi (Enterprise Architecture):** Real istehsalat mühitində (Stripe, Adyen və s.) ödəniş xarici HTTP zəngidir və lokal DB tranzaksiyası daxilində aparılmır. Əvəzində 2-fazalı ödəniş (Authorize & Capture), İdempotency Keys (təkrar ödənişin qarşısı) və asinxron Webhook bildirişləri istifadə olunur. Layihədə isə bu proses etibarlı və qapalı test mühiti üçün simulyasiya edilmişdir.

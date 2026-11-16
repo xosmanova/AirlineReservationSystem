@@ -146,13 +146,13 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 17: Ödəniş simulyasiyası
 **Branch:** `feat/payment-simulation`
-- [ ] `IPaymentGateway` + `MockPaymentGateway`: kart nömrəsi (Luhn), bitmə tarixi (keçməyib), CVV formatı. Test kartları: `4111111111111111` uğurlu, `4000000000000002` rədd
-- [ ] Rədd: rezervasiya yaranmır, hold qalır, aydın xəta mesajı (`ApiResponse`). Uğurlu: `Payment` (məbləğ, status `Completed`, saxta istinad kodu)
-- [ ] **Kart datası saxlanılmır və loglanmır** (test ilə təsdiqlə)
-- [ ] README qeydi: real sistemdə ödəniş xarici çağırışdır və tranzaksiyadan kənarda idarə olunur, burada simulyasiya olduğu üçün sadələşdirilib
-- [ ] Testlər: uğurlu, rədd, vaxtı keçmiş kart, hold bitdikdən sonra ödəniş cəhdi
-**Commit-lər:** `feat(payments): add mock payment gateway with luhn check`, `feat(bookings): use payment gateway in checkout`, `test(payments): cover payment outcomes and card data safety`
-**Bitmə meyarı:** rədd edilən kartla rezervasiya yaranmır, uğurlu kartla PNR alınır.
+- [x] `IPaymentGateway` + `MockPaymentGateway`: kart nömrəsi (Luhn), bitmə tarixi (keçməyib), CVV formatı. Test kartları: `4111111111111111` uğurlu, `4000000000000002` rədd (Insufficient funds), `4000000000000010` rədd (Lost or stolen)
+- [x] Rədd: rezervasiya yaranmır, hold qalır, aydın xəta mesajı (`ApiResponse`). Uğurlu: `Payment` (məbləğ, status `Success`, saxta istinad kodu `TXN-...`)
+- [x] **Kart datası saxlanılmır və loglanmır** (test ilə təsdiqləndi - PCI DSS)
+- [x] README qeydi: real sistemdə ödəniş xarici çağırışdır və tranzaksiyadan kənarda idarə olunur, burada simulyasiya olduğu üçün sadələşdirilib
+- [x] Testlər: uğurlu, rədd, vaxtı keçmiş kart, hold bitdikdən sonra ödəniş cəhdi, təkrar uğurlu cəhd
+**Commit-lər:** `feat(payments): add mock payment gateway with luhn check`, `test(payments): cover payment outcomes and card data safety`
+**Bitmə meyarı:** rədd edilən kartla rezervasiya yaranmır, hold qalır, uğurlu kartla PNR alınır, 343 test yaşıldır.
 
 ### Gün 18: Rezervasiya sorğuları və ləğv
 **Branch:** `feat/bookings-queries-cancel`
