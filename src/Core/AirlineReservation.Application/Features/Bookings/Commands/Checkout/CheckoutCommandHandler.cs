@@ -206,7 +206,7 @@ public class CheckoutCommandHandler : IRequestHandler<CheckoutCommand, ApiRespon
                     LastName = p.LastName.Trim(),
                     PassportNumber = p.PassportNumber.Trim().ToUpperInvariant(),
                     DateOfBirth = p.DateOfBirth.Date,
-                    Gender = "Unspecified"
+                    Gender = "Other"
                 };
 
                 var ticket = new Ticket
