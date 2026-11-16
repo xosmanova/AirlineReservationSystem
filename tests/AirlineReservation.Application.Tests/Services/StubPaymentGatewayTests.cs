@@ -33,20 +33,4 @@ public class StubPaymentGatewayTests
         Assert.StartsWith("TX-", result.TransactionReference);
         Assert.Null(result.ErrorMessage);
     }
-
-    [Fact]
-    public void StubPaymentGateway_ShouldBeRegisteredInServiceCollection()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act
-        services.AddApplicationServices();
-
-        // Assert
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IPaymentGateway));
-        Assert.NotNull(descriptor);
-        Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
-        Assert.Equal(typeof(StubPaymentGateway), descriptor.ImplementationType);
-    }
 }

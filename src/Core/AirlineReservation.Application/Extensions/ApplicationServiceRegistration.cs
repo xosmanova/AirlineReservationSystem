@@ -34,8 +34,8 @@ public static class ApplicationServiceRegistration
         // Register IPnrGenerator for cryptographically secure booking references
         services.AddSingleton<IPnrGenerator, PnrGenerator>();
 
-        // Register IPaymentGateway (Stub for Day 16, replaced by mock in Day 17)
-        services.TryAddSingleton<IPaymentGateway, StubPaymentGateway>();
+        // Register IPaymentGateway (Simulated mock gateway with Luhn and decline test cards)
+        services.TryAddSingleton<IPaymentGateway, MockPaymentGateway>();
 
         // Register MediatR handlers and validation pipeline behavior
         services.AddMediatR(cfg =>
