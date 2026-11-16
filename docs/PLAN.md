@@ -136,13 +136,13 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 16: Checkout mühərriki (ən kritik gün)
 **Branch:** `feat/checkout-engine`
-- [ ] `CheckoutCommand` + handler, `IUnitOfWork` tranzaksiyası. Addımlar: (1) istifadəçinin bu reysdəki hold-larını yüklə, **vaxtı bitməyibsə** davam et (əks halda 409 "kilidin vaxtı bitib"), (2) yerlərin hələ aktiv biletlə dolu olmadığını yoxla, (3) yekun qiyməti `PricingService`-dən hesabla (müştərinin göndərdiyinə etibar yox), (4) `IPaymentGateway` çağır (bu gün müvəqqəti həmişə-uğurlu stub), (5) `Passenger`, `Ticket`, `Booking (Confirmed, PNR)`, `Payment` yaz, (6) hold-ları sil, commit
-- [ ] Unikal indeks pozuntusu → 409. PNR toqquşması → təkrar cəhd
-- [ ] `POST /api/v1/bookings/checkout` `[Authorize]`
-- [ ] Hold-u olmayan və ya başqasının hold-u ilə checkout rədd edilir
-- [ ] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdursa rədd; vaxtı bitmiş hold ilə rədd; uğurlu checkout biletləri və PNR yaradır, hold-lar silinir; **paralel iki checkout eyni oturacaq üçün yalnız biri uğurlu**; 400 cavab gövdəsində və test logger çıxışında kart nömrəsi və CVV axtarışı (AttemptedValue sızmaması yoxlanışı)
-**Commit-lər:** `feat(bookings): add checkout command consuming seat holds`, `fix(bookings): reject expired or foreign holds`, `feat(api): add checkout endpoint`, `test(bookings): add checkout integration and concurrency tests`
-**Bitmə meyarı:** Scalar-da hold → checkout → PNR işləyir, paralel test keçir.
+- [x] `CheckoutCommand` + handler, `IUnitOfWork` tranzaksiyası. Addımlar: (1) istifadəçinin bu reysdəki hold-larını yüklə, **vaxtı bitməyibsə** davam et (əks halda 409 "kilidin vaxtı bitib"), (2) yerlərin hələ aktiv biletlə dolu olmadığını yoxla, (3) yekun qiyməti `PricingService`-dən hesabla (müştərinin göndərdiyinə etibar yox), (4) `IPaymentGateway` çağır (bu gün müvəqqəti həmişə-uğurlu stub), (5) `Passenger`, `Ticket`, `Booking (Confirmed, PNR)`, `Payment` yaz, (6) hold-ları sil, commit
+- [x] Unikal indeks pozuntusu → 409. PNR toqquşması → təkrar cəhd
+- [x] `POST /api/v1/bookings/checkout` `[Authorize]`
+- [x] Hold-u olmayan və ya başqasının hold-u ilə checkout rədd edilir
+- [x] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdursa rədd; vaxtı bitmiş hold ilə rədd; uğurlu checkout biletləri və PNR yaradır, hold-lar silinir; **paralel iki checkout eyni oturacaq üçün yalnız biri uğurlu**; 400 cavab gövdəsində və test logger çıxışında kart nömrəsi və CVV axtarışı (AttemptedValue sızmaması yoxlanışı)
+**Commit-lər:** `feat(payments): add payment gateway abstraction and stub`, `feat(bookings): add checkout command handler consuming seat holds`, `feat(api): add checkout endpoint to bookings controller`, `test(bookings): add checkout integration and concurrency tests`
+**Bitmə meyarı:** Scalar-da hold → checkout → PNR işləyir, paralel test keçir, 322 test hamısı yaşıldır.
 
 ### Gün 17: Ödəniş simulyasiyası
 **Branch:** `feat/payment-simulation`

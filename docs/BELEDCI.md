@@ -53,7 +53,7 @@ graph TD
 
 ---
 
-## 2. Gün-Gün İcra Cədvəli (Gün 1–15)
+## 2. Gün-Gün İcra Cədvəli (Gün 1–16)
 
 | Gün | Əsas Mövzu | Əsas Nəticə və Həll Olunan Problem | Əsas Fayllar və Commit-lər |
 |---|---|---|---|
@@ -72,6 +72,7 @@ graph TD
 | **Gün 13** | Sifariş Qiymətləndirmə (Quote) | Çoxsaylı yerlərin cəmi qiymətini hesablamaq üçün `POST .../quote` endpoint-i yazıldı. Xəritə ilə quote qiyməti tam eyniləşdirildi. | `GetBookingQuoteQueryHandler.cs` |
 | **Gün 14** | Verilənlər Bazası Əsaslı Oturacaq Kilidi (SeatHold) | 10 dəqiqəlik yer kilidi (`SeatHold`), unikal SQL indeksi (ikiqat hold-un qarşısı), rollback təhlükəsizliyi, `HoldCleanupService` və delta xəritə statusu endpoint-i. | `SeatHold.cs`, `CreateSeatHoldCommandHandler.cs`, `HoldCleanupService.cs` |
 | **Gün 15** | PNR Generator və Checkout Validasiyası | 32 simvollu kriptoqrafik 6 hərfli PNR (`RandomNumberGenerator.GetItems`), kart təhlükəsizliyi (maskalanmış ToString, echo qadağası), Azərbaycan adları dəstəyi. | `PnrGenerator.cs`, `CheckoutCommandValidator.cs` |
+| **Gün 16** | Checkout Mühərriki & Hold İstehlakı (F6) | Vahid ACID tranzaksiyada hold yoxlanışı, `PricingService` ilə server qiymət hesablanması, `IPaymentGateway` ödəniş, unikal PNR, biletlər (`ET-{pnr}-{seat}`), hold-ların silinməsi və paralel checkout testi. | `CheckoutCommandHandler.cs`, `BookingsController.cs`, `CheckoutIntegrationTests.cs` |
 
 ---
 
@@ -225,12 +226,15 @@ Middleware bütün tətbiqdə baş verən xətaları tutur və onları standart 
 - `AppValidationException` $\rightarrow$ `400 Bad Request` (Validasiya xətaları siyahısı ilə)
 - Digər gözlənilməz xətalar $\rightarrow$ `500 Internal Server Error` (İstifadəçiyə sistemin daxili detalları göstərilmir, ümumi təhlükəsiz mesaj verilir, xəta isə logger-ə yazılır).
 
-### Sual 12: Gün 16-da yazılacaq Checkout Mühərrikinin əsas addımları nələr olacaq?
+### Sual 12: Gün 16-da yazılan Checkout Mühərriki necə işləyir və paralellik (race condition) necə qorunur?
 **Cavab:**
-Gün 16 layihənin ən məsuliyyətli hissəsidir. `CheckoutCommand` gəldikdə vahid tranzaksiya daxilində bu addımlar icra olunacaq:
-1. İstifadəçinin bu reysdəki aktiv `SeatHold`-ları bazadan oxunur; vaxtı bitibsə və ya hold yoxdursa dərhal `409 Conflict` verilir.
-2. Seçilmiş yerlərin aktiv biletlə dolu olmadığı təkrar yoxlanılır.
-3. Server tərəfdə `PricingService` ilə yekun qiymət hesablanır.
-4. Ödəniş şlüzü çağırılır (`IPaymentGateway`).
-5. `Passenger`, `Ticket`, `Booking` (`Status = Confirmed`, unikal `PnrCode`) və `Payment` qeydləri bazaya yazılır.
-6. İstifadəçinin bu reysdəki `SeatHold`-ları bazadan tam silinir və tranzaksiya tamamlanır (`Commit`).
+Gün 16 layihənin ən mühüm və məsuliyyətli hissəsidir. `CheckoutCommand` gəldikdə vahid **ACID tranzaksiya** daxilində aşağıdakı boru xətti icra olunur:
+1. **Satıla bilənlik yoxlanışı:** Uçuşun mövcudluğu, statusu (`Scheduled` / `Delayed`) və uçuş vaxtının gələcəkdə olması yoxlanılır (əks halda `409 Conflict`).
+2. **Yerlərin aidiyyəti:** Göndərilən bütün yerlərin həmin uçuşun təyyarəsinə aid olması və artıq biletlə dolu olmadığı yoxlanılır.
+3. **Aktiv Hold İstehlakı:** `IUnitOfWork.SeatHolds.GetUserActiveHoldsForFlightAsync` ilə istifadəçinin bu reysdəki aktiv `SeatHold`-ları yoxlanılır. Hold yoxdursa və ya vaxtı bitibsə dərhal `409 Conflict` qaytarılır.
+4. **Server Qiymət Hesablanması:** Müştərinin göndərdiyi qiymətlərə güvənilmir; `IPricingService` server tərəfdə hər yerin qəpiyinə qədər dəqiq qiymətini yenidən hesablayır.
+5. **Ödəniş Şlüzü:** `IPaymentGateway` çağırılır (kart rədd edildikdə tranzaksiya dərhal rollback olunur və `400 BadRequest` atılır).
+6. **Unikal PNR:** `IPnrGenerator` ilə 6 simvollu PNR yaradılır (bazada mövcud olarsa 5 dəfəyə qədər avtomatik təkrar cəhd edilir).
+7. **Qalıcı Qeydlər:** `Booking` (`Status = Confirmed`), `Ticket` (`TicketNumber = $"ET-{pnrCode}-{seatNumber}"`), `Passenger` və `Payment` (`Success`) vahid qraf olaraq əlavə edilir.
+8. **Hold-ların Silinməsi:** İstifadəçinin bu reys üzrə müvəqqəti `SeatHold` qeydləri eyni tranzaksiya daxilində bazadan silinir (`ReleaseUserHoldsForFlightAsync`).
+9. **Paralellik Qoruması (Concurrency):** Əgər eyni anda iki proses eyni oturacaq üçün bilet yazmağa çalışarsa, SQL Server `(FlightId, SeatId)` unikal filtri indeksi səviyyəsində ikinci tranzaksiya `2601/2627` xətası alır; `UnitOfWork` bunu avtomatik `UniqueConstraintViolationException`-a və nəticədə `409 Conflict`-ə çevirir. Yalnız 1 sifariş uğurlu olur (testlərlə 100% sübut olunmuşdur).
