@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using AirlineReservation.Application.Common.Models;
 using AirlineReservation.Application.DTOs.Booking;
 using MediatR;
@@ -11,6 +12,12 @@ namespace AirlineReservation.Application.Features.Bookings.Commands.Checkout;
 /// </summary>
 public class CheckoutCommand : IRequest<ApiResponse<CheckoutResultDto>>
 {
+    /// <summary>
+    /// Authenticated User ID populated from JWT claims in the API controller.
+    /// </summary>
+    [JsonIgnore]
+    public Guid UserId { get; set; }
+
     public int FlightId { get; set; }
     public List<CheckoutPassengerDto> Passengers { get; set; } = [];
     public CheckoutContactDto Contact { get; set; } = new();
@@ -21,6 +28,6 @@ public class CheckoutCommand : IRequest<ApiResponse<CheckoutResultDto>>
     /// </summary>
     public override string ToString()
     {
-        return $"CheckoutCommand {{ FlightId = {FlightId}, PassengerCount = {Passengers?.Count ?? 0}, ContactEmail = {Contact?.Email}, Card = {Card} }}";
+        return $"CheckoutCommand {{ FlightId = {FlightId}, UserId = {UserId}, PassengerCount = {Passengers?.Count ?? 0}, ContactEmail = {Contact?.Email}, Card = {Card} }}";
     }
 }
