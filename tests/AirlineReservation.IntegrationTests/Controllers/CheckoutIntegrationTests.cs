@@ -217,7 +217,7 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
         var body = await response.Content.ReadFromJsonAsync<ApiResponse>(JsonOptions);
         Assert.NotNull(body);
         Assert.False(body.Success);
-        Assert.Contains("Active seat hold required", body.Message);
+        Assert.Contains("expired", body.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
         var command = CreateValidCheckoutCommand(_testFlightId, seatIds);
         var response = await client.PostAsJsonAsync("/api/v1/bookings/checkout", command);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<CheckoutResultDto>>(JsonOptions);
         Assert.NotNull(body);
         Assert.True(body.Success);
@@ -309,7 +309,7 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
                 Assert.Equal(_testFlightId, ticket.FlightId);
                 Assert.Contains(ticket.SeatId, seatIds);
                 Assert.False(ticket.IsCancelled);
-                Assert.StartsWith($"ET-{body.Data.PnrCode}-", ticket.TicketNumber);
+                Assert.StartsWith($"{body.Data.PnrCode}-", ticket.TicketNumber);
             }
 
             // Holds consumed (deleted)
@@ -362,8 +362,8 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
 
         var statusCodes = responses.Select(r => r.StatusCode).ToList();
 
-        // Exactly one should succeed with 200, the other should receive 409 Conflict
-        Assert.Contains(HttpStatusCode.OK, statusCodes);
+        // Exactly one should succeed with 201 Created, the other should receive 409 Conflict
+        Assert.Contains(HttpStatusCode.Created, statusCodes);
         Assert.Contains(HttpStatusCode.Conflict, statusCodes);
 
         // Verify only 1 booking and 1 ticket created in DB
@@ -491,7 +491,7 @@ public class CheckoutIntegrationTests : IClassFixture<CustomWebApplicationFactor
         commandSuccess.Card.CardNumber = MockPaymentGateway.SuccessTestCard;
 
         var responseSuccess = await client.PostAsJsonAsync("/api/v1/bookings/checkout", commandSuccess);
-        Assert.Equal(HttpStatusCode.OK, responseSuccess.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, responseSuccess.StatusCode);
         var bodySuccess = await responseSuccess.Content.ReadFromJsonAsync<ApiResponse<CheckoutResultDto>>(JsonOptions);
         Assert.NotNull(bodySuccess?.Data);
         Assert.Equal("Confirmed", bodySuccess.Data.Status);

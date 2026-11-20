@@ -51,7 +51,7 @@ public class BookingsController : BaseApiController
     /// <returns>Standardized ApiResponse containing confirmed booking details and PNR code.</returns>
     [HttpPost("checkout")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<CheckoutResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CheckoutResultDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
