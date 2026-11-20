@@ -11,6 +11,8 @@ using AirlineReservation.Application.Features.Bookings.Queries.GetBookingQuote;
 using AirlineReservation.Application.Features.Bookings.Queries.GetMyBookings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using AirlineReservation.API.Extensions;
 
 namespace AirlineReservation.API.Controllers;
 
@@ -83,6 +85,7 @@ public class BookingsController : BaseApiController
     /// <returns>Standardized ApiResponse containing confirmed itinerary and ticket details.</returns>
     [HttpGet("pnr/{pnr}")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.PnrLookupPolicy)]
     [ProducesResponseType(typeof(ApiResponse<BookingDetailsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]

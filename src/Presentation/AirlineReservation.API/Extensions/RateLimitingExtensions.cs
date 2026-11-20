@@ -11,6 +11,7 @@ namespace AirlineReservation.API.Extensions;
 public static class RateLimitingExtensions
 {
     public const string LoginPolicy = "login";
+    public const string PnrLookupPolicy = "pnr-lookup";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -43,6 +44,22 @@ public static class RateLimitingExtensions
                         {
                             PermitLimit = permitLimit,
                             Window = TimeSpan.FromSeconds(windowSeconds),
+                            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                            QueueLimit = 0,
+                            AutoReplenishment = true
+                        });
+                });
+
+                options.AddPolicy(PnrLookupPolicy, httpContext =>
+                {
+                    var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+                    return RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey,
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 15,
+                            Window = TimeSpan.FromMinutes(1),
                             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                             QueueLimit = 0,
                             AutoReplenishment = true
