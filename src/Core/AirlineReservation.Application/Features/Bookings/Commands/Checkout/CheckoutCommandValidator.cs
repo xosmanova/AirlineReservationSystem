@@ -128,6 +128,12 @@ public class CheckoutCommandValidator : AbstractValidator<CheckoutCommand>
                 .Must(expiry => IsExpiryValid(expiry, _businessTime))
                 .WithMessage("Card has expired or expiry date is invalid.");
         });
+
+        When(x => x.ExpectedTotalAmount.HasValue, () =>
+        {
+            RuleFor(x => x.ExpectedTotalAmount!.Value)
+                .GreaterThan(0).WithMessage("Expected total amount must be greater than zero.");
+        });
     }
 
     private static bool IsExpiryValid(string expiry, IBusinessTime businessTime)

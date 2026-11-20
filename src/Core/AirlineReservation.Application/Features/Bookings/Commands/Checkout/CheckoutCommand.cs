@@ -24,10 +24,16 @@ public class CheckoutCommand : IRequest<ApiResponse<CheckoutResultDto>>
     public CardPaymentDto Card { get; set; } = new();
 
     /// <summary>
+    /// Optional client-expected total price. If provided and differs from the server-calculated total price,
+    /// checkout aborts with 409 Conflict (PriceChanged) without charging the card.
+    /// </summary>
+    public decimal? ExpectedTotalAmount { get; set; }
+
+    /// <summary>
     /// Returns a log-safe string representation where card numbers are masked and CVVs are redacted.
     /// </summary>
     public override string ToString()
     {
-        return $"CheckoutCommand {{ FlightId = {FlightId}, UserId = {UserId}, PassengerCount = {Passengers?.Count ?? 0}, ContactEmail = {Contact?.Email}, Card = {Card} }}";
+        return $"CheckoutCommand {{ FlightId = {FlightId}, UserId = {UserId}, ExpectedTotalAmount = {ExpectedTotalAmount}, PassengerCount = {Passengers?.Count ?? 0}, ContactEmail = {Contact?.Email}, Card = {Card} }}";
     }
 }
