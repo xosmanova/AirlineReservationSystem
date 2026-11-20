@@ -76,6 +76,43 @@ dotnet ef migrations add <MiqrasiyaAdi> --project src/Infrastructure/AirlineRese
 
 ---
 
+### Backend-in İşə Salınması (Quick Start)
+1. **İlkin Tələblər:**
+   * .NET 10 SDK
+   * Microsoft SQL Server (`.\SQLEXPRESS` və ya `appsettings.json`-da göstərilən əlaqə sətri)
+
+2. **Admin Parolunun Təyini (User Secrets):**
+   ```powershell
+   dotnet user-secrets set "Seed:AdminPassword" "YourStrongAdminPass123!" --project src/Presentation/AirlineReservation.API
+   ```
+
+3. **API-nin İşə Salınması və Avtomatik Seed:**
+   ```powershell
+   dotnet run --project src/Presentation/AirlineReservation.API
+   ```
+   *İnkişaf (Development) mühitində verilənlər bazası avtomatik miqrasiya olunur və 1,816 reys, 8 təyyarə, oturacaq xəritələri və admin hesabı generasiya edilir.*
+
+4. **İnteraktiv API Sənədləşməsi (Scalar API Reference):**
+   API işə düşdükdən sonra brauzerdə açın:
+   * **Scalar UI:** `https://localhost:5001/scalar/v1` (və ya `http://localhost:5000/scalar/v1`)
+   * **OpenAPI JSON:** `https://localhost:5001/openapi/v1.json`
+   * Scalar interfeysində *Bearer* token daxil edərək bütün qorunan endpoint-ləri birbaşa test etmək mümkündür.
+
+5. **CORS Dəstəyi (`AllowClient`):**
+   * Əsasən `http://localhost:3000` (müştəri veb tətbiqi) və lokal inkişaf portları üçün `AllowCredentials()`, `AllowAnyHeader()`, `AllowAnyMethod()` dəstəyi ilə konfiqurasiya edilib.
+
+---
+
+### Avtomatlaşdırılmış Testlər (Automated Test Suite)
+Bütün 406 testi icra etmək üçün:
+```powershell
+dotnet test
+```
+* **AirlineReservation.Application.Tests (317 test):** MediatR CQRS əmrləri və sorğuları, FluentValidation qaydaları, Pricing dinamik qiymətləndirmə kalkulyasiyası, MockPaymentGateway Luhn və revers əməliyyatları, PNR generator.
+* **AirlineReservation.IntegrationTests (89 test):** Real WebApplicationFactory və SQL Server / InMemory bazası üzərində tam API inteqrasiyası, 20 dövrlü paralel oturacaq yarışları, ikiqat checkout sorğularının qorunması, atomik claim və kompensasiya, atomik ləğv (409 Conflict) və rate limiting.
+
+---
+
 ### Layihə Qovluq Quruluşu
 ```text
 FinalProject/
@@ -91,7 +128,8 @@ FinalProject/
 │   │   └── AirlineReservation.Admin/          # ASP.NET Core MVC idarəetmə paneli
 │   └── Client/                                # Vanilla JS müştəri tətbiqi (Web Speech API)
 ├── tests/
-│   └── AirlineReservation.Application.Tests/  # xUnit vahid testləri
+│   ├── AirlineReservation.Application.Tests/  # xUnit vahid testləri (317 test)
+│   └── AirlineReservation.IntegrationTests/   # API İnteqrasiya və Concurrency testləri (89 test)
 ├── docs/
 │   └── PLAN.md                                # 40 günlük inkişaf yol xəritəsi
 ├── AGENT_RULES.md                             # AI Agent və developer əməkdaşlıq qaydaları
