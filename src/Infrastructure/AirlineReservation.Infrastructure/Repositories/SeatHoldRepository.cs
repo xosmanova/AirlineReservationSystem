@@ -41,6 +41,33 @@ public class SeatHoldRepository : ISeatHoldRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SeatHold>> GetUserAllHoldsForFlightAsync(
+        int flightId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.SeatHolds
+            .Where(h => h.FlightId == flightId && h.UserId == userId)
+            .Include(h => h.Seat)
+            .OrderBy(h => h.Seat.RowNumber)
+            .ThenBy(h => h.Seat.ColumnLetter)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> ClaimHoldsAsync(
+        int flightId,
+        Guid userId,
+        IReadOnlyCollection<int> holdIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (holdIds.Count == 0) return 0;
+
+        return await _context.SeatHolds
+            .Where(h => h.FlightId == flightId && h.UserId == userId && holdIds.Contains(h.Id))
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SeatHold>> GetUserActiveHoldsAsync(
         Guid userId,
         DateTime utcNow,
