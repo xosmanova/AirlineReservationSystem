@@ -92,6 +92,8 @@ public class CheckoutCommandHandlerTests
         public bool ShouldSucceed { get; set; } = true;
         public string? FailureMessage { get; set; }
         public PaymentProcessRequest? LastRequest { get; private set; }
+        public bool ReverseCalled { get; private set; }
+        public PaymentReversalRequest? LastReversalRequest { get; private set; }
 
         public Task<PaymentProcessResult> ProcessPaymentAsync(PaymentProcessRequest request, CancellationToken cancellationToken = default)
         {
@@ -102,6 +104,13 @@ public class CheckoutCommandHandlerTests
             }
 
             return Task.FromResult(new PaymentProcessResult(false, null, FailureMessage ?? "Card declined"));
+        }
+
+        public Task<PaymentReversalResult> ReverseAsync(PaymentReversalRequest request, CancellationToken cancellationToken = default)
+        {
+            ReverseCalled = true;
+            LastReversalRequest = request;
+            return Task.FromResult(new PaymentReversalResult(true, null));
         }
     }
 
@@ -118,6 +127,7 @@ public class CheckoutCommandHandlerTests
         public bool TransactionCommitted { get; private set; }
         public bool TransactionRolledBack { get; private set; }
         public bool ThrowUniqueConstraintOnCommit { get; set; }
+        public string? UniqueConstraintIndexName { get; set; }
 
         public FakeUnitOfWork(
             IFlightRepository flightRepo,
@@ -142,7 +152,7 @@ public class CheckoutCommandHandlerTests
             if (ThrowUniqueConstraintOnCommit)
             {
                 TransactionRolledBack = true;
-                throw new UniqueConstraintViolationException("Violation of UNIQUE KEY constraint.", null!);
+                throw new UniqueConstraintViolationException("Violation of UNIQUE KEY constraint.", null!, UniqueConstraintIndexName);
             }
 
             TransactionCommitted = true;
@@ -192,6 +202,8 @@ public class CheckoutCommandHandlerTests
 
         public Task<IReadOnlyList<Seat>> GetSeatsByAircraftIdAsync(int aircraftId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<int>> GetOccupiedSeatIdsForFlightAsync(int flightId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<int>> GetActiveOccupiedSeatIdsForFlightAsync(int flightId, IReadOnlyCollection<int> seatIds, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<int>>([]);
         public Task<IReadOnlyList<Seat>> GetSeatsWithStatusForFlightAsync(int flightId, int aircraftId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Seat?> GetByIdAsync(int id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Seat>> GetAllAsync(CancellationToken ct = default) => throw new NotImplementedException();
@@ -218,6 +230,21 @@ public class CheckoutCommandHandlerTests
             return Task.FromResult<IReadOnlyList<SeatHold>>(userHolds);
         }
 
+        public Task<IReadOnlyList<SeatHold>> GetUserAllHoldsForFlightAsync(int flightId, Guid userId, CancellationToken ct = default)
+        {
+            var userHolds = ActiveHolds
+                .Where(h => h.FlightId == flightId && h.UserId == userId)
+                .ToList();
+            return Task.FromResult<IReadOnlyList<SeatHold>>(userHolds);
+        }
+
+        public Task<int> ClaimHoldsAsync(int flightId, Guid userId, IReadOnlyCollection<int> holdIds, CancellationToken ct = default)
+        {
+            HoldsReleased = true;
+            int removed = ActiveHolds.RemoveAll(h => h.FlightId == flightId && h.UserId == userId && holdIds.Contains(h.Id));
+            return Task.FromResult(removed);
+        }
+
         public Task<int> ReleaseUserHoldsForFlightAsync(int flightId, Guid userId, CancellationToken ct = default)
         {
             HoldsReleased = true;
@@ -237,9 +264,14 @@ public class CheckoutCommandHandlerTests
     private sealed class FakeBookingRepository : IBookingRepository
     {
         public List<Booking> SavedBookings { get; } = [];
+        public Func<string, bool>? CustomPnrExists { get; set; }
 
         public Task<bool> PnrExistsAsync(string pnrCode, CancellationToken ct = default)
         {
+            if (CustomPnrExists != null)
+            {
+                return Task.FromResult(CustomPnrExists(pnrCode));
+            }
             return Task.FromResult(SavedBookings.Any(b => b.PnrCode == pnrCode));
         }
 
@@ -320,7 +352,7 @@ public class CheckoutCommandHandlerTests
 
         foreach (var ticket in savedBooking.Tickets)
         {
-            Assert.StartsWith($"ET-{savedBooking.PnrCode}-", ticket.TicketNumber);
+            Assert.StartsWith($"{savedBooking.PnrCode}-", ticket.TicketNumber);
             Assert.False(ticket.IsCancelled);
             Assert.NotNull(ticket.Passenger);
         }
@@ -505,7 +537,7 @@ public class CheckoutCommandHandlerTests
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
-        Assert.Contains("Active seat hold required", ex.Message);
+        Assert.Contains("expired", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -568,6 +600,194 @@ public class CheckoutCommandHandlerTests
         // Act & Assert
         var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
         Assert.Contains("One or more selected seats were just booked by another transaction", ex.Message);
+        Assert.True(uow.TransactionRolledBack);
+        Assert.True(paymentGateway.ReverseCalled);
+        Assert.NotNull(paymentGateway.LastReversalRequest);
+        Assert.Equal(132.00m, paymentGateway.LastReversalRequest.Amount);
+    }
+
+    [Fact]
+    public async Task Handle_PnrCollisionOnCommit_WithPnrIndexName_ThrowsPnrCollisionException_AndReversesPayment()
+    {
+        // Arrange
+        var seatMap = CreateSeatMapData(100);
+        var clock = new FakeClock(FixedUtcNow);
+        var pricingService = new PricingService(new PricingSettings(), clock);
+        var paymentGateway = new FakePaymentGateway();
+        var holdRepo = new FakeSeatHoldRepository
+        {
+            ActiveHolds =
+            [
+                new SeatHold { FlightId = 100, SeatId = 104, UserId = TestUserId, ExpiresAtUtc = FixedUtcNow.UtcDateTime.AddMinutes(5) }
+            ]
+        };
+        var uow = new FakeUnitOfWork(
+            new FakeFlightRepository(seatMap),
+            new FakeSeatRepository([]),
+            holdRepo,
+            new FakeBookingRepository())
+        {
+            ThrowUniqueConstraintOnCommit = true,
+            UniqueConstraintIndexName = "IX_Bookings_PnrCode"
+        };
+
+        var handler = new CheckoutCommandHandler(uow, pricingService, new PnrGenerator(), paymentGateway, clock);
+        var command = CreateValidCommand(100, [104]);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
+        Assert.Contains("PNR collision", ex.Message);
+        Assert.True(uow.TransactionRolledBack);
+        Assert.True(paymentGateway.ReverseCalled);
+    }
+
+    private sealed class SequencePnrGenerator(params string[] pnrSequence) : IPnrGenerator
+    {
+        private int _index;
+        public string Generate()
+        {
+            if (pnrSequence.Length == 0) return "ABC123";
+            var result = pnrSequence[Math.Min(_index, pnrSequence.Length - 1)];
+            _index++;
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task Handle_PnrCollisionBeforePayment_RetriesAndSucceeds_WhenCandidateBecomesUnique()
+    {
+        // Arrange
+        var seatMap = CreateSeatMapData(100);
+        var clock = new FakeClock(FixedUtcNow);
+        var pricingService = new PricingService(new PricingSettings(), clock);
+        var paymentGateway = new FakePaymentGateway();
+        var holdRepo = new FakeSeatHoldRepository
+        {
+            ActiveHolds =
+            [
+                new SeatHold { FlightId = 100, SeatId = 104, UserId = TestUserId, ExpiresAtUtc = FixedUtcNow.UtcDateTime.AddMinutes(5) }
+            ]
+        };
+        var bookingRepo = new FakeBookingRepository
+        {
+            CustomPnrExists = pnr => pnr == "COLL01" // "COLL01" is taken, "FREE02" is free
+        };
+        var uow = new FakeUnitOfWork(
+            new FakeFlightRepository(seatMap),
+            new FakeSeatRepository([]),
+            holdRepo,
+            bookingRepo);
+
+        var pnrGenerator = new SequencePnrGenerator("COLL01", "FREE02");
+        var handler = new CheckoutCommandHandler(uow, pricingService, pnrGenerator, paymentGateway, clock);
+        var command = CreateValidCommand(100, [104]);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal("FREE02", result.Data!.PnrCode);
+        Assert.True(uow.TransactionCommitted);
+    }
+
+    [Fact]
+    public async Task Handle_PnrExhaustionBeforePayment_ThrowsConflictException_WithoutCharging()
+    {
+        // Arrange
+        var seatMap = CreateSeatMapData(100);
+        var clock = new FakeClock(FixedUtcNow);
+        var pricingService = new PricingService(new PricingSettings(), clock);
+        var paymentGateway = new FakePaymentGateway();
+        var holdRepo = new FakeSeatHoldRepository
+        {
+            ActiveHolds =
+            [
+                new SeatHold { FlightId = 100, SeatId = 104, UserId = TestUserId, ExpiresAtUtc = FixedUtcNow.UtcDateTime.AddMinutes(5) }
+            ]
+        };
+        var bookingRepo = new FakeBookingRepository
+        {
+            CustomPnrExists = _ => true // all PNR candidates are taken
+        };
+        var uow = new FakeUnitOfWork(
+            new FakeFlightRepository(seatMap),
+            new FakeSeatRepository([]),
+            holdRepo,
+            bookingRepo);
+
+        var handler = new CheckoutCommandHandler(uow, pricingService, new PnrGenerator(), paymentGateway, clock);
+        var command = CreateValidCommand(100, [104]);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
+        Assert.Contains("Failed to generate a unique PNR", ex.Message);
+        Assert.Null(paymentGateway.LastRequest); // NEVER charged
+        Assert.True(uow.TransactionRolledBack);
+    }
+
+    [Fact]
+    public async Task Handle_PassengerSeatsMismatchWithHeldSeats_ThrowsConflictException_WithoutCharging()
+    {
+        // Arrange
+        var seatMap = CreateSeatMapData(100);
+        var clock = new FakeClock(FixedUtcNow);
+        var pricingService = new PricingService(new PricingSettings(), clock);
+        var paymentGateway = new FakePaymentGateway();
+        var holdRepo = new FakeSeatHoldRepository
+        {
+            // Holds seat 104
+            ActiveHolds =
+            [
+                new SeatHold { FlightId = 100, SeatId = 104, UserId = TestUserId, ExpiresAtUtc = FixedUtcNow.UtcDateTime.AddMinutes(5) }
+            ]
+        };
+        var uow = new FakeUnitOfWork(
+            new FakeFlightRepository(seatMap),
+            new FakeSeatRepository([]),
+            holdRepo,
+            new FakeBookingRepository());
+
+        var handler = new CheckoutCommandHandler(uow, pricingService, new PnrGenerator(), paymentGateway, clock);
+        // Command requests seat 105 instead of 104
+        var command = CreateValidCommand(100, [105]);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
+        Assert.Contains("Passenger seats must match your held seats", ex.Message);
+        Assert.Null(paymentGateway.LastRequest); // NEVER charged
+        Assert.True(uow.TransactionRolledBack);
+    }
+
+    [Fact]
+    public async Task Handle_ExpectedTotalAmountMismatch_ThrowsConflictException_WithoutCharging()
+    {
+        // Arrange
+        var seatMap = CreateSeatMapData(100);
+        var clock = new FakeClock(FixedUtcNow);
+        var pricingService = new PricingService(new PricingSettings(), clock);
+        var paymentGateway = new FakePaymentGateway();
+        var holdRepo = new FakeSeatHoldRepository
+        {
+            ActiveHolds =
+            [
+                new SeatHold { FlightId = 100, SeatId = 104, UserId = TestUserId, ExpiresAtUtc = FixedUtcNow.UtcDateTime.AddMinutes(5) }
+            ]
+        };
+        var uow = new FakeUnitOfWork(
+            new FakeFlightRepository(seatMap),
+            new FakeSeatRepository([]),
+            holdRepo,
+            new FakeBookingRepository());
+
+        var handler = new CheckoutCommandHandler(uow, pricingService, new PnrGenerator(), paymentGateway, clock);
+        var command = CreateValidCommand(100, [104]);
+        command.ExpectedTotalAmount = 50.00m; // actual price is 120.00m
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
+        Assert.Contains("PriceChanged", ex.Message);
+        Assert.Null(paymentGateway.LastRequest); // NEVER charged
         Assert.True(uow.TransactionRolledBack);
     }
 }
