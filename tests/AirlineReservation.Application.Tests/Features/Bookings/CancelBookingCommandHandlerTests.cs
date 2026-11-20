@@ -181,7 +181,7 @@ public class CancelBookingCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_BookingAlreadyCancelled_ThrowsBadRequestException()
+    public async Task Handle_BookingAlreadyCancelled_ThrowsConflictException()
     {
         var departureTime = _timeProvider.GetUtcNow().UtcDateTime.AddHours(30);
         var booking = CreateTestBooking(5, OwnerUserId, BookingStatus.Cancelled, 120.00m, departureTime);
@@ -191,7 +191,7 @@ public class CancelBookingCommandHandlerTests
 
         var command = new CancelBookingCommand(5, OwnerUserId, IsAdmin: false);
 
-        var ex = await Assert.ThrowsAsync<BadRequestException>(() => handler.Handle(command, CancellationToken.None));
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(command, CancellationToken.None));
         Assert.Contains("already cancelled", ex.Message);
     }
 

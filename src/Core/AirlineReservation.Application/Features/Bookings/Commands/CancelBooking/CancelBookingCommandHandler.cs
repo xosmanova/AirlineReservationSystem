@@ -46,7 +46,7 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
 
         if (booking.Status == BookingStatus.Cancelled)
         {
-            throw new BadRequestException("Booking is already cancelled.");
+            throw new ConflictException("Booking is already cancelled.");
         }
 
         var flight = booking.Tickets.FirstOrDefault()?.Flight;
@@ -66,6 +66,18 @@ public class CancelBookingCommandHandler : IRequestHandler<CancelBookingCommand,
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
+            var affected = await _unitOfWork.Bookings.CancelBookingAtomicAsync(
+                booking.Id,
+                calculation.RefundAmount,
+                nowUtc,
+                cancellationToken);
+
+            if (affected == 0)
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw new ConflictException("Booking is already cancelled.");
+            }
+
             booking.Status = BookingStatus.Cancelled;
             booking.RefundAmount = calculation.RefundAmount;
             booking.CancelledAtUtc = nowUtc;
