@@ -184,27 +184,27 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Commit-lər:** `feat(bookings): add pnr lookup and my trips queries`, `feat(bookings): add cancellation policy with refund amount`, `feat(bookings): add cancel and cancel preview endpoints`, `test(bookings): cover cancellation boundaries and ownership`
 **Bitmə meyarı:** ləğvdən sonra oturacaq xəritədə boşdur, qaytarma məbləği düzgündür.
 
-### Gün 19: Gün 16-18 düzəlişləri, backend inteqrasiyası (bufer) və `v0.1-backend`
+### Gün 19: Gün 16-18 düzəlişləri, backend inteqrasiyası (bufer) və `v0.1-backend` (TAMAMLANDI)
 **Branch:** əvvəl `fix/checkout-atomic-claim`, sonra `chore/backend-integration`
 **A. Məcburi düzəlişlər (Gün 16-nın Bölməsinə bax, testdən başla):**
-- [ ] **Qırmızı test əvvəl:** eyni istifadəçi eyni anda iki dəfə checkout göndərir, test gateway `ChargeAsync` çağırışlarını sayır. Hazırkı kodda **2 çağırış** olmalıdır (qüsurun sübutu), sonra düzəliş edilir və test **1** göstərir
-- [ ] Hold-ları ödənişdən əvvəl **atomik claim et** (`ExecuteDeleteAsync`, silinən say hold sayına bərabər olmalıdır, yoxsa 409 və ödəniş çağırılmır). Bütün hold-lar (vaxtı bitmişlər də) yüklənir, sərnişin yerləri hold yerlərinə bərabər olmalıdır
-- [ ] `TicketSpecifications.IsActive` ilə dolu yer yoxlaması, PNR ödənişdən əvvəl (`AnyAsync`, ≤ 5 cəhd)
-- [ ] `UniqueConstraintViolationException.IndexName` (Infrastructure `SqlException` mesajından çıxarır): PNR indeksi və bilet indeksi ayrı-ayrı işlənir
-- [ ] `IPaymentGateway.ReverseAsync` + kompensasiya (ödəniş uğurlu, sonrakı addım uğursuz), `PaymentProcessRequest.ToString()` maskalı
-- [ ] İsteğe bağlı `ExpectedTotalAmount` (409 `PriceChanged`), `TicketNumber = {pnr}-{sıra}`, uğurlu cavab 201
-- [ ] Testlər: ikiqat göndərmə (bir rezervasiya, **bir** ödəniş), paralel iki istifadəçi **20 dövr**, rədd edən gateway hold-ları saxlayır, yazma uğursuz olanda `ReverseAsync`, PNR toqquşması (saxta generator), sərnişin yerləri ≠ hold yerləri, başqa reysdəki hold
+- [x] **Qırmızı test əvvəl:** eyni istifadəçi eyni anda iki dəfə checkout göndərir, test gateway `ChargeAsync` çağırışlarını sayır. Hazırkı kodda **2 çağırış** olmalıdır (qüsurun sübutu), sonra düzəliş edilir və test **1** göstərir
+- [x] Hold-ları ödənişdən əvvəl **atomik claim et** (`ExecuteDeleteAsync`, silinən say hold sayına bərabər olmalıdır, yoxsa 409 və ödəniş çağırılmır). Bütün hold-lar (vaxtı bitmişlər də) yüklənir, sərnişin yerləri hold yerlərinə bərabər olmalıdır
+- [x] `TicketSpecifications.IsActive` ilə dolu yer yoxlaması, PNR ödənişdən əvvəl (`AnyAsync`, ≤ 5 cəhd)
+- [x] `UniqueConstraintViolationException.IndexName` (Infrastructure `SqlException` mesajından çıxarır): PNR indeksi və bilet indeksi ayrı-ayrı işlənir
+- [x] `IPaymentGateway.ReverseAsync` + kompensasiya (ödəniş uğurlu, sonrakı addım uğursuz), `PaymentProcessRequest.ToString()` maskalı
+- [x] İsteğe bağlı `ExpectedTotalAmount` (409 `PriceChanged`), `TicketNumber = {pnr}-{sıra}`, uğurlu cavab 201
+- [x] Testlər: ikiqat göndərmə (bir rezervasiya, **bir** ödəniş), paralel iki istifadəçi **20 dövr**, rədd edən gateway hold-ları saxlayır, yazma uğursuz olanda `ReverseAsync`, PNR toqquşması (saxta generator), sərnişin yerləri ≠ hold yerləri, başqa reysdəki hold
 **B. Gün 17-18 yoxlama kapısı (oxu rejimi, sonra düzəliş):**
-- [ ] Ləğv **atomikdir və təkrarlanmır:** iki eyni vaxtlı ləğv sorğusu iki dəfə qaytarma yaratmır (status keçidi şərtli yeniləmə ilə, silinən/yenilənən sətir sayı yoxlanır). Test: paralel iki ləğv, bir qaytarma
-- [ ] PNR axtarışı (`AllowAnonymous`): rate limit və yanlış PNR ilə yanlış soyad üçün **eyni** 404 mesajı (məlumat sızmır)
-- [ ] `MockPaymentGateway`: hansı kartlar uğurlu/rədd, `Payment` cədvəlində kart sahəsi yoxdur, log çıxışında kart datası yoxdur (test)
-- [ ] Ləğv siyasəti sərhədləri (tam 24 saat, qalxmış reys), başqasının rezervasiyası 403/404
+- [x] Ləğv **atomikdir və təkrarlanmır:** iki eyni vaxtlı ləğv sorğusu iki dəfə qaytarma yaratmır (status keçidi şərtli yeniləmə ilə, silinən/yenilənən sətir sayı yoxlanır). Test: paralel iki ləğv, bir qaytarma
+- [x] PNR axtarışı (`AllowAnonymous`): rate limit və yanlış PNR ilə yanlış soyad üçün **eyni** 404 mesajı (məlumat sızmır)
+- [x] `MockPaymentGateway`: hansı kartlar uğurlu/rədd, `Payment` cədvəlində kart sahəsi yoxdur, log çıxışında kart datası yoxdur (test)
+- [x] Ləğv siyasəti sərhədləri (tam 24 saat, qalxmış reys), başqasının rezervasiyası 403/404
 **C. İnteqrasiya (bufer):**
-- [ ] Scalar-da tam ssenari: qeydiyyat → axtarış → xəritə → quote → hold → checkout → my → ləğv
-- [ ] Bug-lar, çatışmayan testlər, `has-pending-model-changes` exit 0, CORS (`AllowClient` Client origin-i ilə)
-- [ ] README: backend işə salma (SQL Server, migration, user-secrets, seed)
-- [ ] `AGENT_RULES.md` və bu plan real vəziyyətə uyğunlaşdırılır (Hold qaydası, tək addımlı checkout, claim)
-- [ ] `develop` → `main` merge, tag `v0.1-backend` (**yalnız A və B bitəndən sonra**)
+- [x] Scalar-da tam ssenari: qeydiyyat → axtarış → xəritə → quote → hold → checkout → my → ləğv
+- [x] Bug-lar, çatışmayan testlər, `has-pending-model-changes` exit 0, CORS (`AllowClient` Client origin-i ilə)
+- [x] README: backend işə salma (SQL Server, migration, user-secrets, seed)
+- [x] `AGENT_RULES.md` və bu plan real vəziyyətə uyğunlaşdırılır (Hold qaydası, tək addımlı checkout, claim)
+- [x] `develop` → `main` merge, tag `v0.1-backend` (**yalnız A və B bitəndən sonra**)
 **Bitmə meyarı:** ikiqat göndərmə yalnız bir ödəniş yaradır, ikiqat ləğv yalnız bir qaytarma yaradır, bütün backend axını Scalar-da sınaqdan keçib.
 
 ### MƏRHƏLƏ B: İstifadəçi saytı (Gün 20-27)

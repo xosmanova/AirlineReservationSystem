@@ -49,8 +49,12 @@ Bu fayl SkyReserve layihəsi üzərində işləyən developer və AI agent-in ri
    * Bilet üçün: `IsCancelled = true`, `CancelledAtUtc = timeProvider.GetUtcNow().UtcDateTime` (birbaşa `DateTime.UtcNow` qadağandır).
    * Rezervasiya üçün: `Status = BookingStatus.Cancelled` və ya `BookingStatus.Expired`.
    * Tickets unikal cütlüyü (`FlightId, SeatId`) üçün indeks filtri: `[IsDeleted] = 0 AND [IsCancelled] = 0`.
-4. **Oturacaq Kilidi və Rezervasiya Qaydası (Hold Rule):**
-   * **Hold rule:** before locking or selling a seat, in the SAME transaction delete the expired SeatHold rows of that seat. Checkout verifies hold ownership and expiry, deletes the holds and writes tickets in one transaction. The cleanup service is only housekeeping, not the safety mechanism. Seat locks live in the database (SeatHold), never in memory. Checkout is a single step: hold -> mock payment -> Booking (Confirmed). Booking.ExpiresAtUtc and BookingStatus.Pending/Expired are not used in this flow.
+4. **Oturacaq Kilidi və Rezervasiya Qaydası (Hold Rule & Atomic Claim):**
+   * **Hold rule:** before locking or selling a seat, in the SAME transaction delete the expired SeatHold rows of that seat.
+   * **Atomic claim:** Checkout verifies hold ownership and expiry, atomically claims holds via `ExecuteDeleteAsync` (verifying deleted rows match requested holds) BEFORE charging payment.
+   * **Compensation:** If payment succeeds but any subsequent write or commit fails, the transaction is rolled back and payment is compensated via `IPaymentGateway.ReverseAsync` using `CancellationToken.None`.
+   * Seat locks live in the database (`SeatHold`), never in memory. The cleanup background service is only housekeeping, not the safety mechanism.
+   * Checkout is a single step: hold -> atomic claim -> mock payment -> Booking (Confirmed). Booking.ExpiresAtUtc and BookingStatus.Pending/Expired are not used in this flow.
 5. **Generators və Pure Funksiyalar:**
    * Oturacaq düzülüşü (`SeatLayoutGenerator`) və reys cədvəli (`FlightScheduleGenerator`) `Application` qatında pure funksiyalar (EF-dən kənar) kimi saxlanılmalıdır.
    * Təyyarənin `TotalSeats` sayı hər zaman generator-dan çıxan real yerlərin sayı ilə eyni olmalıdır (yeganə həqiqət mənbəyi).
