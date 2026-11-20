@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using AirlineReservation.Application.Common.Exceptions;
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Domain.Common;
@@ -47,14 +48,31 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        try
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            return await _context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                return await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                var (isViolation, indexName) = ExtractUniqueConstraintViolation(ex);
+                if (isViolation)
+                {
+                    throw new UniqueConstraintViolationException("A unique constraint or unique index was violated.", ex, indexName);
+                }
+
+                if (attempt == 0 && _transaction == null && IsDeadlockException(ex))
+                {
+                    await Task.Delay(50, cancellationToken);
+                    continue;
+                }
+
+                throw;
+            }
         }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-        {
-            throw new UniqueConstraintViolationException("A unique constraint or unique index was violated.", ex);
-        }
+
+        return 0;
     }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -78,10 +96,20 @@ public class UnitOfWork : IUnitOfWork
                 await _transaction.CommitAsync(cancellationToken);
             }
         }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        catch (DbUpdateException ex)
         {
+            var (isViolation, indexName) = ExtractUniqueConstraintViolation(ex);
             await RollbackTransactionAsync(cancellationToken);
-            throw new UniqueConstraintViolationException("A unique constraint or unique index was violated during transaction commit.", ex);
+
+            if (isViolation)
+            {
+                throw new UniqueConstraintViolationException(
+                    "A unique constraint or unique index was violated during transaction commit.",
+                    ex,
+                    indexName);
+            }
+
+            throw;
         }
         catch
         {
@@ -98,12 +126,30 @@ public class UnitOfWork : IUnitOfWork
         }
     }
 
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    private static (bool IsViolation, string? IndexName) ExtractUniqueConstraintViolation(DbUpdateException ex)
     {
         var current = ex.InnerException;
         while (current != null)
         {
             if (current is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+            {
+                var match = Regex.Match(sqlEx.Message, @"(?:unique index|constraint)\s+'([^']+)'", RegexOptions.IgnoreCase);
+                var indexName = match.Success ? match.Groups[1].Value : null;
+                return (true, indexName);
+            }
+
+            current = current.InnerException;
+        }
+
+        return (false, null);
+    }
+
+    private static bool IsDeadlockException(Exception ex)
+    {
+        var current = ex;
+        while (current != null)
+        {
+            if (current is SqlException sqlEx && sqlEx.Number == 1205)
             {
                 return true;
             }
