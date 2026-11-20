@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using AirlineReservation.Application.Common.Interfaces;
 
 namespace AirlineReservation.Application.Common.Services;
@@ -10,6 +11,12 @@ namespace AirlineReservation.Application.Common.Services;
 public class MockPaymentGateway : IPaymentGateway
 {
     private readonly TimeProvider _timeProvider;
+    private readonly ConcurrentBag<string> _reversedTransactions = new();
+
+    /// <summary>
+    /// Collection of transaction references that have been reversed via ReverseAsync.
+    /// </summary>
+    public IReadOnlyCollection<string> ReversedTransactions => _reversedTransactions.ToArray();
 
     // Special test card numbers triggering deterministic gateway responses
     public const string SuccessTestCard = "4111111111111111";
@@ -116,6 +123,26 @@ public class MockPaymentGateway : IPaymentGateway
         // 8. Successful payment simulation
         var transactionRef = $"TXN-{Guid.NewGuid():N}"[..18].ToUpperInvariant();
         return Task.FromResult(new PaymentProcessResult(true, transactionRef, null));
+    }
+
+    public Task<PaymentReversalResult> ReverseAsync(
+        PaymentReversalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(request.TransactionReference))
+        {
+            return Task.FromResult(new PaymentReversalResult(false, "Transaction reference is required for reversal."));
+        }
+
+        if (request.Amount <= 0m)
+        {
+            return Task.FromResult(new PaymentReversalResult(false, "Reversal amount must be greater than zero."));
+        }
+
+        _reversedTransactions.Add(request.TransactionReference);
+        return Task.FromResult(new PaymentReversalResult(true, null));
     }
 
     /// <summary>

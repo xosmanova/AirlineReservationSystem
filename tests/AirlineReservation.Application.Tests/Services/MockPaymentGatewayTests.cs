@@ -199,6 +199,47 @@ public class MockPaymentGatewayTests
     }
 
     [Fact]
+    public async Task ReverseAsync_ValidTransactionReference_RecordsReversalAndSucceeds()
+    {
+        var request = new PaymentReversalRequest("TXN-1234567890", 150.00m, "AZN");
+
+        var result = await _sut.ReverseAsync(request);
+
+        Assert.True(result.Success);
+        Assert.Null(result.ErrorMessage);
+        Assert.Contains("TXN-1234567890", _sut.ReversedTransactions);
+    }
+
+    [Theory]
+    [InlineData("", 100)]
+    [InlineData("   ", 100)]
+    [InlineData("TXN-123", 0)]
+    [InlineData("TXN-123", -50)]
+    public async Task ReverseAsync_InvalidRequest_ReturnsFailure(string txRef, decimal amount)
+    {
+        var request = new PaymentReversalRequest(txRef, amount, "AZN");
+
+        var result = await _sut.ReverseAsync(request);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.ErrorMessage);
+    }
+
+    [Fact]
+    public void PaymentProcessRequest_ToString_NeverLeaksCardNumberOrCvv()
+    {
+        var request = CreateValidRequest(cardNumber: "4111111111111111", cvv: "456");
+
+        var str = request.ToString();
+
+        Assert.DoesNotContain("4111111111111111", str);
+        Assert.DoesNotContain("4111 1111 1111", str);
+        Assert.DoesNotContain("456", str);
+        Assert.Contains("1111", str);
+        Assert.Contains("Cvv = ***", str);
+    }
+
+    [Fact]
     public void MockPaymentGateway_RegisteredInServiceCollection()
     {
         var services = new ServiceCollection();

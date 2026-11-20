@@ -104,4 +104,19 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
         var normalizedPnr = pnrCode.Trim().ToUpper();
         return await _dbSet.AnyAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
     }
+
+    public async Task<int> CancelBookingAtomicAsync(
+        int bookingId,
+        decimal refundAmount,
+        DateTime cancelledAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Bookings
+            .Where(b => b.Id == bookingId && b.Status != Domain.Enums.BookingStatus.Cancelled)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.Status, Domain.Enums.BookingStatus.Cancelled)
+                .SetProperty(b => b.RefundAmount, refundAmount)
+                .SetProperty(b => b.CancelledAtUtc, cancelledAtUtc),
+                cancellationToken);
+    }
 }

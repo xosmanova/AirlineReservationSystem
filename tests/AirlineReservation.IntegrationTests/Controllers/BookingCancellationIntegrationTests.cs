@@ -172,7 +172,7 @@ public class BookingCancellationIntegrationTests : IClassFixture<CustomWebApplic
         };
 
         var checkoutResp = await client.PostAsJsonAsync("/api/v1/bookings/checkout", command);
-        Assert.Equal(HttpStatusCode.OK, checkoutResp.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, checkoutResp.StatusCode);
 
         var checkoutResult = await checkoutResp.Content.ReadFromJsonAsync<ApiResponse<CheckoutResultDto>>(JsonOptions);
         Assert.NotNull(checkoutResult);
@@ -363,7 +363,7 @@ public class BookingCancellationIntegrationTests : IClassFixture<CustomWebApplic
     }
 
     [Fact]
-    public async Task CancelBooking_AlreadyCancelled_Returns400BadRequest()
+    public async Task CancelBooking_AlreadyCancelled_Returns409Conflict()
     {
         var targetSeat = _testSeats[5];
         var (_, token) = await CreateUserAndTokenAsync("cancel_twice@airline.test");
@@ -380,10 +380,56 @@ public class BookingCancellationIntegrationTests : IClassFixture<CustomWebApplic
 
         // Cancel second time
         var cancelResp2 = await client.PostAsync($"/api/v1/bookings/{bookingId}/cancel", null);
-        Assert.Equal(HttpStatusCode.BadRequest, cancelResp2.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, cancelResp2.StatusCode);
 
         var body = await cancelResp2.Content.ReadFromJsonAsync<ApiResponse>(JsonOptions);
         Assert.NotNull(body);
         Assert.Contains("already cancelled", body.Message);
+    }
+
+    [Fact]
+    public async Task CancelBooking_ConcurrentRequests_ExactlyOneSucceeds_AndSingleRefundApplied()
+    {
+        var targetSeat = _testSeats[0];
+        var (_, token) = await CreateUserAndTokenAsync("concurrent_cancel@airline.test");
+
+        var client1 = _factory.CreateClient();
+        client1.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var client2 = _factory.CreateClient();
+        client2.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var checkoutResult = await CreateBookingViaCheckoutAsync(client1, _testFlightId, targetSeat.Id);
+        var bookingId = checkoutResult.BookingId;
+
+        var startGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var t1 = Task.Run(async () =>
+        {
+            await startGate.Task;
+            return await client1.PostAsync($"/api/v1/bookings/{bookingId}/cancel", null);
+        });
+
+        var t2 = Task.Run(async () =>
+        {
+            await startGate.Task;
+            return await client2.PostAsync($"/api/v1/bookings/{bookingId}/cancel", null);
+        });
+
+        startGate.SetResult();
+        var responses = await Task.WhenAll(t1, t2);
+
+        var statuses = responses.Select(r => r.StatusCode).ToList();
+        Assert.Contains(HttpStatusCode.OK, statuses);
+        Assert.Contains(HttpStatusCode.Conflict, statuses);
+
+        // Verify database state: status Cancelled, single refund amount
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var booking = await db.Bookings.FindAsync(bookingId);
+        Assert.NotNull(booking);
+        Assert.Equal(BookingStatus.Cancelled, booking.Status);
+        Assert.NotNull(booking.RefundAmount);
+        Assert.Equal(checkoutResult.TotalAmount, booking.RefundAmount.Value);
     }
 }

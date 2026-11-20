@@ -13,4 +13,9 @@ public class StubPaymentGateway : IPaymentGateway
         var transactionRef = $"TX-{Guid.NewGuid():N}"[..16].ToUpperInvariant();
         return Task.FromResult(new PaymentProcessResult(true, transactionRef, null));
     }
+
+    public Task<PaymentReversalResult> ReverseAsync(PaymentReversalRequest request, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(new PaymentReversalResult(true, null));
+    }
 }

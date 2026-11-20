@@ -16,4 +16,7 @@ public interface IBookingRepository : IGenericRepository<Booking>
     Task<IReadOnlyList<Booking>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default);
 
     Task<bool> PnrExistsAsync(string pnrCode, CancellationToken cancellationToken = default);
+
+    Task<int> CancelBookingAtomicAsync(int bookingId, decimal refundAmount, DateTime cancelledAtUtc, CancellationToken cancellationToken = default)
+        => Task.FromResult(1);
 }

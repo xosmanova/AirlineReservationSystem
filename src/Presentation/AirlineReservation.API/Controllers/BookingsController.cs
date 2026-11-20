@@ -11,6 +11,8 @@ using AirlineReservation.Application.Features.Bookings.Queries.GetBookingQuote;
 using AirlineReservation.Application.Features.Bookings.Queries.GetMyBookings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using AirlineReservation.API.Extensions;
 
 namespace AirlineReservation.API.Controllers;
 
@@ -51,7 +53,7 @@ public class BookingsController : BaseApiController
     /// <returns>Standardized ApiResponse containing confirmed booking details and PNR code.</returns>
     [HttpPost("checkout")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResponse<CheckoutResultDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CheckoutResultDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -83,6 +85,7 @@ public class BookingsController : BaseApiController
     /// <returns>Standardized ApiResponse containing confirmed itinerary and ticket details.</returns>
     [HttpGet("pnr/{pnr}")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.PnrLookupPolicy)]
     [ProducesResponseType(typeof(ApiResponse<BookingDetailsDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
@@ -166,6 +169,7 @@ public class BookingsController : BaseApiController
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Cancel(
         int id,
         CancellationToken cancellationToken)

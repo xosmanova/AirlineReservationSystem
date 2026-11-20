@@ -31,7 +31,7 @@ public class GetBookingByPnrQueryHandler : IRequestHandler<GetBookingByPnrQuery,
         var booking = await _unitOfWork.Bookings.GetByPnrWithDetailsAsync(normalizedPnr, cancellationToken);
         if (booking == null)
         {
-            throw new NotFoundException($"Booking with PNR '{normalizedPnr}' was not found.");
+            throw new NotFoundException("No booking found matching the provided PNR code and passenger last name.");
         }
 
         // Verify that at least one passenger on this booking matches the provided last name
@@ -40,7 +40,7 @@ public class GetBookingByPnrQueryHandler : IRequestHandler<GetBookingByPnrQuery,
 
         if (!hasMatchingPassenger)
         {
-            throw new NotFoundException($"No passenger with last name '{normalizedLastName}' was found on booking '{normalizedPnr}'.");
+            throw new NotFoundException("No booking found matching the provided PNR code and passenger last name.");
         }
 
         var dto = booking.ToDetailsDto();

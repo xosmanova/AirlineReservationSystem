@@ -192,6 +192,6 @@ public class GetBookingByPnrQueryHandlerTests
         var query = new GetBookingByPnrQuery("AZ78KD", "Mammadov");
 
         var ex = await Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(query, CancellationToken.None));
-        Assert.Contains("No passenger with last name 'Mammadov'", ex.Message);
+        Assert.Contains("No booking found matching the provided PNR code", ex.Message);
     }
 }
