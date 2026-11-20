@@ -1,32 +1,68 @@
+using System.Text.Json.Serialization;
+using AirlineReservation.Application.Common.Models;
+using Microsoft.Extensions.Options;
+using AirlineReservation.API.Extensions;
 using AirlineReservation.API.Middlewares;
+using AirlineReservation.Application.Common.Helpers;
 using AirlineReservation.Application.Extensions;
 using AirlineReservation.Infrastructure.Context;
 using AirlineReservation.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Fail-fast validation of configured business time zone
+var configuredTimeZone = builder.Configuration["Business:TimeZone"] ?? "Asia/Baku";
+TimeZoneHelper.GetRequiredTimeZone(configuredTimeZone);
+
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 // Configure CORS for Client Web App
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:3000", "https://localhost:3000", "http://localhost:3001", "https://localhost:3001"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClient", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
+              .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
-// Register Application Services (MediatR CQRS, Riok.Mapperly)
+// Register Application Services (MediatR CQRS, Riok.Mapperly, IBusinessTime)
 builder.Services.AddApplicationServices();
+builder.Services.AddOptions<PricingSettings>()
+    .Bind(builder.Configuration.GetSection(PricingSettings.SectionName))
+    .Validate(
+        settings => settings.IsValid(out _),
+        "Invalid Pricing configuration: WindowFee, AisleFee, and LastMinuteDays must be >= 0, and LastMinuteMultiplier must be >= 1.0.")
+    .ValidateOnStart();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<PricingSettings>>().Value);
 
-// Register Infrastructure Services (EF Core, Repositories, Unit of Work)
+builder.Services.AddOptions<HoldSettings>()
+    .Bind(builder.Configuration.GetSection(HoldSettings.SectionName))
+    .Validate(
+        settings => settings.IsValid(out _),
+        "Invalid Hold configuration: Minutes and CleanupSeconds must be > 0.")
+    .ValidateOnStart();
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<HoldSettings>>().Value);
+
+// Register Infrastructure Services (EF Core, Repositories, Unit of Work, Identity)
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddJwtAuthentication();
+builder.Services.AddLoginRateLimiting();
 
-builder.Services.AddOpenApi();
+builder.Services.AddSwaggerAndScalarOpenApi();
 
 var app = builder.Build();
 
@@ -45,6 +81,9 @@ if (app.Environment.IsDevelopment())
 
         Console.WriteLine("Seeding initial aviation data...");
         await AppDbContextSeed.SeedAsync(dbContext, app.Configuration, app.Logger);
+
+        Console.WriteLine("Seeding identity roles and admin user...");
+        await AppDbContextSeed.SeedIdentityAsync(scope.ServiceProvider, app.Configuration, app.Logger);
         Console.WriteLine("Database migrated and seeded successfully!");
     }
     catch (Exception ex)
@@ -57,12 +96,22 @@ if (app.Environment.IsDevelopment())
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("Airline Reservation API")
+               .WithTheme(ScalarTheme.Moon)
+               .AddPreferredSecuritySchemes("Bearer");
+    });
 }
 
-app.UseHttpsRedirection();
 app.UseCors("AllowClient");
+app.UseRateLimiter();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

@@ -18,6 +18,7 @@ namespace AirlineReservation.Application.Common.Mappings;
 [Mapper]
 public partial class AirlineMappingProfile
 {
+    [MapProperty(nameof(Airport.TimeZone), nameof(AirportDto.Timezone))]
     public partial AirportDto ToDto(Airport entity);
     public partial IReadOnlyList<AirportDto> ToDtoList(IEnumerable<Airport> entities);
 
@@ -27,12 +28,15 @@ public partial class AirlineMappingProfile
     public partial SeatDto ToDto(Seat entity);
     public partial IReadOnlyList<SeatDto> ToDtoList(IEnumerable<Seat> entities);
 
+    [MapProperty(nameof(Flight.Aircraft.Model), nameof(FlightDto.AircraftModel))]
+    [MapProperty(nameof(Flight.Aircraft.TotalSeats), nameof(FlightDto.TotalSeats))]
     public partial FlightDto ToDto(Flight entity);
     public partial IReadOnlyList<FlightDto> ToDtoList(IEnumerable<Flight> entities);
 
     [MapProperty(nameof(PassengerCreateDto.PassportNumber), nameof(Passenger.PassportNumber), Use = nameof(NormalizePassport))]
     public partial Passenger ToEntity(PassengerCreateDto dto);
 
+    [UserMapping(Default = false)]
     public static string NormalizePassport(string passport) => passport?.Trim().ToUpperInvariant() ?? string.Empty;
 }
 #pragma warning restore RMG020

@@ -1,4 +1,5 @@
 using AirlineReservation.Domain.Entities;
+using AirlineReservation.Infrastructure.Identity.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -22,6 +23,9 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.TotalAmount)
             .HasColumnType("decimal(18,2)");
 
+        builder.Property(b => b.RefundAmount)
+            .HasColumnType("decimal(18,2)");
+
         builder.Property(b => b.ContactEmail)
             .IsRequired()
             .HasMaxLength(100);
@@ -29,6 +33,18 @@ public class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.ContactPhone)
             .IsRequired()
             .HasMaxLength(30);
+
+        // Required relationship to AspNetUsers (Identity AppUser) with Restrict delete behavior
+        builder.Property(b => b.UserId)
+            .IsRequired();
+
+        builder.HasOne<AppUser>()
+            .WithMany()
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
+        builder.HasIndex(b => b.UserId);
 
         builder.HasMany(b => b.Tickets)
             .WithOne(t => t.Booking)

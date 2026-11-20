@@ -2,14 +2,17 @@ using System.Diagnostics;
 using AirlineReservation.Application.Common.Generators;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Infrastructure.Identity.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace AirlineReservation.Infrastructure.Context;
 
 /// <summary>
-/// Aviation database seed engine.
+/// Aviation and Identity database seed engine.
 /// All data generated is FICTIONAL / DEMO data intended solely for testing, demonstration, and validation.
 /// </summary>
 public static class AppDbContextSeed
@@ -56,17 +59,42 @@ public static class AppDbContextSeed
         {
             var airports = new List<Airport>
             {
-                new() { IataCode = "GYD", Name = "Heydar Aliyev International Airport", City = "Baku", Country = "Azerbaijan", TimeZone = "UTC+4" },
-                new() { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3" },
-                new() { IataCode = "SAW", Name = "Sabiha Gokcen International Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3" },
-                new() { IataCode = "DXB", Name = "Dubai International Airport", City = "Dubai", Country = "United Arab Emirates", TimeZone = "UTC+4" },
-                new() { IataCode = "JFK", Name = "John F. Kennedy International Airport", City = "New York", Country = "United States", TimeZone = "UTC-5" },
-                new() { IataCode = "LHR", Name = "Heathrow Airport", City = "London", Country = "United Kingdom", TimeZone = "UTC+0" },
-                new() { IataCode = "FRA", Name = "Frankfurt Airport", City = "Frankfurt", Country = "Germany", TimeZone = "UTC+1" }
+                new() { IataCode = "GYD", Name = "Heydar Aliyev International Airport", City = "Baku", Country = "Azerbaijan", TimeZone = "UTC+4", Aliases = "Baku,Bakı,Baki,Баку" },
+                new() { IataCode = "IST", Name = "Istanbul Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3", Aliases = "Istanbul,İstanbul,Istanbul Airport,Стамбул" },
+                new() { IataCode = "SAW", Name = "Sabiha Gokcen International Airport", City = "Istanbul", Country = "Turkey", TimeZone = "UTC+3", Aliases = "Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул" },
+                new() { IataCode = "DXB", Name = "Dubai International Airport", City = "Dubai", Country = "United Arab Emirates", TimeZone = "UTC+4", Aliases = "Dubai,Dubay,Дубай" },
+                new() { IataCode = "JFK", Name = "John F. Kennedy International Airport", City = "New York", Country = "United States", TimeZone = "UTC-5", Aliases = "New York,Nyu-York,Нью-Йорк" },
+                new() { IataCode = "LHR", Name = "Heathrow Airport", City = "London", Country = "United Kingdom", TimeZone = "UTC+0", Aliases = "London,Londan,Лондон" },
+                new() { IataCode = "FRA", Name = "Frankfurt Airport", City = "Frankfurt", Country = "Germany", TimeZone = "UTC+1", Aliases = "Frankfurt,Франкфурт" }
             };
 
             await context.Airports.AddRangeAsync(airports);
             await context.SaveChangesAsync();
+        }
+        else
+        {
+            var airportsWithoutAliases = await context.Airports.Where(a => string.IsNullOrEmpty(a.Aliases)).ToListAsync();
+            if (airportsWithoutAliases.Count > 0)
+            {
+                var aliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["GYD"] = "Baku,Bakı,Baki,Баку",
+                    ["IST"] = "Istanbul,İstanbul,Istanbul Airport,Стамбул",
+                    ["SAW"] = "Istanbul,İstanbul,Sabiha Gökçen,Sabiha Gokcen,Стамбул",
+                    ["DXB"] = "Dubai,Dubay,Дубай",
+                    ["JFK"] = "New York,Nyu-York,Нью-Йорк",
+                    ["LHR"] = "London,Londan,Лондон",
+                    ["FRA"] = "Frankfurt,Франкфурт"
+                };
+                foreach (var a in airportsWithoutAliases)
+                {
+                    if (aliasMap.TryGetValue(a.IataCode, out var val))
+                    {
+                        a.Aliases = val;
+                    }
+                }
+                await context.SaveChangesAsync();
+            }
         }
 
         // 2. Seed Airlines (All 4 airlines)
@@ -326,5 +354,123 @@ public static class AppDbContextSeed
         string summary = $"[SEED COMPLETE] Airports: {totalAirports}, Airlines: {totalAirlines}, Aircrafts: {totalAircrafts}, Seats: {totalSeats}, Flights: {totalFlights} | Elapsed: {stopwatch.ElapsedMilliseconds} ms.";
         logger?.LogInformation("{Summary}", summary);
         Console.WriteLine(summary);
+    }
+
+    /// <summary>
+    /// Seeds Identity roles (Admin, Customer) and the initial Admin user.
+    /// Admin password must be provided strictly via configuration (Seed:AdminPassword), typically via user-secrets in development.
+    /// If Seed:AdminPassword is missing, admin user creation is safely skipped without throwing an exception.
+    /// </summary>
+    public static async Task SeedIdentityAsync(
+        IServiceProvider serviceProvider,
+        IConfiguration? configuration = null,
+        ILogger? logger = null)
+    {
+        bool seedEnabled = true;
+        if (configuration?["Seed:Enabled"] is { } enabledStr && bool.TryParse(enabledStr, out var parsedEnabled))
+        {
+            seedEnabled = parsedEnabled;
+        }
+
+        if (!seedEnabled)
+        {
+            logger?.LogInformation("Identity seeding is disabled via configuration (Seed:Enabled=false).");
+            return;
+        }
+
+        var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
+        var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
+
+        await SeedIdentityCoreAsync(roleManager, userManager, configuration, logger);
+    }
+
+    /// <summary>
+    /// Core seeding logic decoupled from IServiceProvider for high unit testability.
+    /// </summary>
+    public static async Task SeedIdentityCoreAsync(
+        RoleManager<AppRole> roleManager,
+        UserManager<AppUser> userManager,
+        IConfiguration? configuration = null,
+        ILogger? logger = null)
+    {
+        bool seedEnabled = true;
+        if (configuration?["Seed:Enabled"] is { } enabledStr && bool.TryParse(enabledStr, out var parsedEnabled))
+        {
+            seedEnabled = parsedEnabled;
+        }
+
+        if (!seedEnabled)
+        {
+            return;
+        }
+
+        // 1. Seed Roles: Admin, Customer
+        string[] roles = ["Admin", "Customer"];
+        foreach (var roleName in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(roleName))
+            {
+                var roleResult = await roleManager.CreateAsync(new AppRole(roleName));
+                if (roleResult.Succeeded)
+                {
+                    logger?.LogInformation("Role {RoleName} seeded successfully.", roleName);
+                }
+                else
+                {
+                    var errorCodes = string.Join(", ", roleResult.Errors.Select(e => e.Code));
+                    logger?.LogError("Failed to seed role {RoleName}: {ErrorCodes}", roleName, errorCodes);
+                }
+            }
+        }
+
+        // 2. Read Admin configuration (Seed:AdminPassword only from configuration/user secrets)
+        string adminEmail = string.IsNullOrWhiteSpace(configuration?["Seed:AdminEmail"])
+            ? "admin@airline.test"
+            : configuration["Seed:AdminEmail"]!;
+        string? adminPassword = configuration?["Seed:AdminPassword"];
+
+        if (string.IsNullOrWhiteSpace(adminPassword))
+        {
+            logger?.LogWarning("Admin password configuration (Seed:AdminPassword) is missing or empty. Skipping admin user creation.");
+            Console.WriteLine("[IDENTITY SEED] Warning: Seed:AdminPassword is missing or empty. Skipping admin user creation.");
+            return;
+        }
+
+        // 3. Seed Admin user if not already present
+        var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
+        if (existingAdmin == null)
+        {
+            var adminUser = new AppUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true,
+                FirstName = "System",
+                LastName = "Administrator",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var createResult = await userManager.CreateAsync(adminUser, adminPassword);
+            if (createResult.Succeeded)
+            {
+                await userManager.AddToRoleAsync(adminUser, "Admin");
+                logger?.LogInformation("Admin user {AdminEmail} seeded successfully with Admin role.", adminEmail);
+                Console.WriteLine($"[IDENTITY SEED] Admin user '{adminEmail}' seeded successfully.");
+            }
+            else
+            {
+                var errorCodes = string.Join(", ", createResult.Errors.Select(e => e.Code));
+                logger?.LogWarning("Failed to seed admin user {AdminEmail}. Validation error codes: {ErrorCodes}. Skipping.", adminEmail, errorCodes);
+                Console.WriteLine($"[IDENTITY SEED WARNING] Failed to seed admin user ({errorCodes}). Skipping.");
+            }
+        }
+        else
+        {
+            if (!await userManager.IsInRoleAsync(existingAdmin, "Admin"))
+            {
+                await userManager.AddToRoleAsync(existingAdmin, "Admin");
+                logger?.LogInformation("Admin user {AdminEmail} already existed; added missing Admin role.", adminEmail);
+            }
+        }
     }
 }

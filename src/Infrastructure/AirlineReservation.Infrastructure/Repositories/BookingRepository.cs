@@ -14,6 +14,33 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
     {
     }
 
+    public async Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet
+            .Include(b => b.Payment)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.DepartureAirport)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.ArrivalAirport)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Flight)
+                    .ThenInclude(f => f.Airline)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Seat)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Passenger)
+            .Where(b => b.Id == id);
+
+        if (!trackChanges)
+        {
+            query = query.AsNoTracking();
+        }
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken cancellationToken = default)
     {
         var normalizedPnr = pnrCode.Trim().ToUpper();
@@ -36,7 +63,7 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
             .FirstOrDefaultAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Include(b => b.Payment)
@@ -49,6 +76,10 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
             .Include(b => b.Tickets)
                 .ThenInclude(t => t.Flight)
                     .ThenInclude(f => f.Airline)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Seat)
+            .Include(b => b.Tickets)
+                .ThenInclude(t => t.Passenger)
             .Where(b => b.UserId == userId)
             .OrderByDescending(b => b.CreatedAt)
             .AsNoTracking()
@@ -72,5 +103,20 @@ public class BookingRepository : GenericRepository<Booking>, IBookingRepository
     {
         var normalizedPnr = pnrCode.Trim().ToUpper();
         return await _dbSet.AnyAsync(b => b.PnrCode.ToUpper() == normalizedPnr, cancellationToken);
+    }
+
+    public async Task<int> CancelBookingAtomicAsync(
+        int bookingId,
+        decimal refundAmount,
+        DateTime cancelledAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.Bookings
+            .Where(b => b.Id == bookingId && b.Status != Domain.Enums.BookingStatus.Cancelled)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.Status, Domain.Enums.BookingStatus.Cancelled)
+                .SetProperty(b => b.RefundAmount, refundAmount)
+                .SetProperty(b => b.CancelledAtUtc, cancelledAtUtc),
+                cancellationToken);
     }
 }

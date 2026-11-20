@@ -28,6 +28,10 @@ Bu fayl SkyReserve layihəsi üzərində işləyən developer və AI agent-in ri
    Yalnız MIT və ya Apache 2.0 lisenziyalı paketlərə icazə verilir. Qeyri-pulsuz / kommersiya lisenziyalı kitabxanalar (məsələn, FluentAssertions v8) qadağandır. Testlərdə standart `xUnit` asserts istifadə olunur.
 3. **System.Security.Cryptography.Pkcs:**
    Tranzitiv `NU1903` yüksək dərəcəli zəiflik xəbərdarlığını susdurmaq üçün `10.0.14` versiyasında saxlanılır və `.csproj` faylında müvafiq XML şərhlə sənədləşdirilir.
+4. **Zaman və Saat Qurşağı İdarəetməsi (TimeProvider):**
+   Kod bazasında birbaşa `DateTime.UtcNow` və ya `DateTime.Now` çağırışları qadağandır. Həmişə `TimeProvider.GetUtcNow()` (və ya `IBusinessTime` servisi) inyeksiya olunmalıdır ki, xUnit testlərində `FakeTimeProvider` ilə zaman dəqiq simulyasiya edilə bilsin.
+5. **Test Clock Independence Rule:**
+   Tests must never depend on the real clock or on a hard-coded calendar date. Use one fixed or fake TimeProvider and build all test dates relative to it. Token issuing and token validation must use the same time source.
 
 ---
 
@@ -42,11 +46,15 @@ Bu fayl SkyReserve layihəsi üzərində işləyən developer və AI agent-in ri
    * Bütün unikal indekslər `[IsDeleted] = 0` filtri ilə təmin edilməlidir.
 3. **Ləğvolunma və Silinmə Fərqi:**
    * Bilet (`Ticket`) və ya Rezervasiya (`Booking`) ləğv edildikdə və ya vaxtı bitdikdə **heç vaxt `IsDeleted` istifadə edilmir**.
-   * Bilet üçün: `IsCancelled = true`, `CancelledAtUtc = DateTime.UtcNow`.
+   * Bilet üçün: `IsCancelled = true`, `CancelledAtUtc = timeProvider.GetUtcNow().UtcDateTime` (birbaşa `DateTime.UtcNow` qadağandır).
    * Rezervasiya üçün: `Status = BookingStatus.Cancelled` və ya `BookingStatus.Expired`.
    * Tickets unikal cütlüyü (`FlightId, SeatId`) üçün indeks filtri: `[IsDeleted] = 0 AND [IsCancelled] = 0`.
-4. **Rezervasiya və Oturacaq Əməliyyatları (Gün 19-20 üçün Qızıl Qayda):**
-   * Oturacaq rezerv edilməzdən əvvəl, həmin oturacağa aid vaxtı keçmiş (`ExpiresAtUtc < UtcNow`) və hələ `Pending` statusunda olan köhnə rezervasiyaların biletləri **eyni tranzaksiyada** `IsCancelled = true` və rezervasiya `BookingStatus.Expired` edilməlidir. Beləliklə, unikal indeks yeni bileti bloklamır.
+4. **Oturacaq Kilidi və Rezervasiya Qaydası (Hold Rule & Atomic Claim):**
+   * **Hold rule:** before locking or selling a seat, in the SAME transaction delete the expired SeatHold rows of that seat.
+   * **Atomic claim:** Checkout verifies hold ownership and expiry, atomically claims holds via `ExecuteDeleteAsync` (verifying deleted rows match requested holds) BEFORE charging payment.
+   * **Compensation:** If payment succeeds but any subsequent write or commit fails, the transaction is rolled back and payment is compensated via `IPaymentGateway.ReverseAsync` using `CancellationToken.None`.
+   * Seat locks live in the database (`SeatHold`), never in memory. The cleanup background service is only housekeeping, not the safety mechanism.
+   * Checkout is a single step: hold -> atomic claim -> mock payment -> Booking (Confirmed). Booking.ExpiresAtUtc and BookingStatus.Pending/Expired are not used in this flow.
 5. **Generators və Pure Funksiyalar:**
    * Oturacaq düzülüşü (`SeatLayoutGenerator`) və reys cədvəli (`FlightScheduleGenerator`) `Application` qatında pure funksiyalar (EF-dən kənar) kimi saxlanılmalıdır.
    * Təyyarənin `TotalSeats` sayı hər zaman generator-dan çıxan real yerlərin sayı ilə eyni olmalıdır (yeganə həqiqət mənbəyi).

@@ -1,6 +1,7 @@
 using AirlineReservation.Application.Contracts.Persistence;
 using AirlineReservation.Domain.Entities;
 using AirlineReservation.Domain.Enums;
+using AirlineReservation.Domain.Specifications;
 using AirlineReservation.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,13 +28,27 @@ public class SeatRepository : GenericRepository<Seat>, ISeatRepository
 
     public async Task<IReadOnlyList<int>> GetOccupiedSeatIdsForFlightAsync(int flightId, CancellationToken cancellationToken = default)
     {
-        // A seat is occupied only if its ticket is active (not deleted, not cancelled) and its booking is not Cancelled or Expired
+        // Single source of truth: TicketSpecifications.IsActive
         return await _context.Tickets
             .Include(t => t.Booking)
-            .Where(t => t.FlightId == flightId
-                        && !t.IsCancelled
-                        && t.Booking.Status != BookingStatus.Cancelled
-                        && t.Booking.Status != BookingStatus.Expired)
+            .Where(t => t.FlightId == flightId)
+            .Where(TicketSpecifications.IsActive)
+            .Select(t => t.SeatId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<int>> GetActiveOccupiedSeatIdsForFlightAsync(
+        int flightId,
+        IReadOnlyCollection<int> seatIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (seatIds.Count == 0) return [];
+
+        return await _context.Tickets
+            .Include(t => t.Booking)
+            .Where(t => t.FlightId == flightId && seatIds.Contains(t.SeatId))
+            .Where(TicketSpecifications.IsActive)
             .Select(t => t.SeatId)
             .Distinct()
             .ToListAsync(cancellationToken);

@@ -7,11 +7,16 @@ namespace AirlineReservation.Application.Contracts.Persistence;
 /// </summary>
 public interface IBookingRepository : IGenericRepository<Booking>
 {
+    Task<Booking?> GetByIdWithDetailsAsync(int id, bool trackChanges = true, CancellationToken cancellationToken = default);
+
     Task<Booking?> GetByPnrWithDetailsAsync(string pnrCode, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(string userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Booking>> GetBookingsByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Booking>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default);
 
     Task<bool> PnrExistsAsync(string pnrCode, CancellationToken cancellationToken = default);
+
+    Task<int> CancelBookingAtomicAsync(int bookingId, decimal refundAmount, DateTime cancelledAtUtc, CancellationToken cancellationToken = default)
+        => Task.FromResult(1);
 }

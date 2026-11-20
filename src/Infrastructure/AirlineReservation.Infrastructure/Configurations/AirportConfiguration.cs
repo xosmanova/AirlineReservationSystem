@@ -33,6 +33,9 @@ public class AirportConfiguration : IEntityTypeConfiguration<Airport>
         builder.Property(a => a.TimeZone)
             .HasMaxLength(50);
 
+        builder.Property(a => a.Aliases)
+            .HasMaxLength(500);
+
         builder.HasMany(a => a.DepartingFlights)
             .WithOne(f => f.DepartureAirport)
             .HasForeignKey(f => f.DepartureAirportId)

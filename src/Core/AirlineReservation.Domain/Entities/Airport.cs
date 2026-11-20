@@ -10,6 +10,11 @@ public class Airport : BaseEntity
     public string Country { get; set; } = string.Empty;  // Azerbaijan
     public string TimeZone { get; set; } = string.Empty; // UTC+4
 
+    /// <summary>
+    /// Comma-separated alternative names, localized city spellings, or aliases for search (e.g. Baku,Bakı,Baki,Баку).
+    /// </summary>
+    public string? Aliases { get; set; }
+
     // Navigation properties
     public ICollection<Flight> DepartingFlights { get; set; } = [];
     public ICollection<Flight> ArrivingFlights { get; set; } = [];

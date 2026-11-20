@@ -1,20 +1,44 @@
 using System.Reflection;
 using AirlineReservation.Application.Common.Behaviors;
+using AirlineReservation.Application.Common.Generators;
+using AirlineReservation.Application.Common.Interfaces;
 using AirlineReservation.Application.Common.Mappings;
+using AirlineReservation.Application.Common.Services;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
+using AirlineReservation.Application.Common.Models;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace AirlineReservation.Application.Extensions;
 
 /// <summary>
-/// Service registration extensions for Application layer dependencies (MediatR, FluentValidation, Mapperly).
+/// Service registration extensions for Application layer dependencies (MediatR, FluentValidation, Mapperly, BusinessTime, PnrGenerator).
 /// </summary>
 public static class ApplicationServiceRegistration
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         var assembly = Assembly.GetExecutingAssembly();
+
+        // Register default TimeProvider
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton(new PricingSettings());
+        services.TryAddSingleton(new HoldSettings());
+        services.TryAddSingleton<IPricingService, PricingService>();
+
+        // Register IBusinessTime for unified timezone-aware day boundary calculations
+        services.AddSingleton<IBusinessTime, BusinessTimeService>();
+
+        // Register IPnrGenerator for cryptographically secure booking references
+        services.AddSingleton<IPnrGenerator, PnrGenerator>();
+
+        // Register ICancellationPolicyService for refund tier calculations
+        services.AddSingleton<ICancellationPolicyService, CancellationPolicyService>();
+
+        // Register IPaymentGateway (Simulated mock gateway with Luhn and decline test cards)
+        services.TryAddSingleton<IPaymentGateway, MockPaymentGateway>();
 
         // Register MediatR handlers and validation pipeline behavior
         services.AddMediatR(cfg =>

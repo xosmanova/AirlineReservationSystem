@@ -1,11 +1,14 @@
 using System.Linq.Expressions;
 using AirlineReservation.Domain.Common;
 using AirlineReservation.Domain.Entities;
+using AirlineReservation.Infrastructure.Converters;
+using AirlineReservation.Infrastructure.Identity.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace AirlineReservation.Infrastructure.Context;
 
-public class AppDbContext : DbContext
+public class AppDbContext : IdentityDbContext<AppUser, AppRole, Guid>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
@@ -20,6 +23,18 @@ public class AppDbContext : DbContext
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+
+        configurationBuilder.Properties<DateTime>()
+            .HaveConversion<UtcDateTimeConverter>();
+
+        configurationBuilder.Properties<DateTime?>()
+            .HaveConversion<NullableUtcDateTimeConverter>();
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,7 +43,7 @@ public class AppDbContext : DbContext
         // Apply all entity configurations from current assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-        // Global query filter for soft delete across every BaseEntity-derived type
+        // Global query filter for soft delete across every BaseEntity-derived type (skips Identity entities)
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))

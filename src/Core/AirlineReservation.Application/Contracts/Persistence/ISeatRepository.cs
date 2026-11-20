@@ -11,5 +11,8 @@ public interface ISeatRepository : IGenericRepository<Seat>
 
     Task<IReadOnlyList<int>> GetOccupiedSeatIdsForFlightAsync(int flightId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<int>> GetActiveOccupiedSeatIdsForFlightAsync(int flightId, IReadOnlyCollection<int> seatIds, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<int>>([]);
+
     Task<IReadOnlyList<Seat>> GetSeatsWithStatusForFlightAsync(int flightId, int aircraftId, CancellationToken cancellationToken = default);
 }
