@@ -6,18 +6,18 @@
 
 ---
 
-## 1. Cari vəziyyət (Gün 1-13: TAMAMLANDI)
+## 1. Cari vəziyyət (Gün 1-8 və hardening: TAMAMLANDI)
 
 - Solution `AirlineReservationSystem.slnx`, layihələr: `Domain`, `Application`, `Infrastructure`, `API`, `Admin` (MVC), `Client` (statik HTML/CSS/JS). Admin heç bir daxili qata istinad etmir.
 - Application: CQRS (**MediatR 12.5.0**, Apache 2.0), `ApiResponse<T>` zərfi, FluentValidation + `ValidationBehavior`, **Riok.Mapperly**, xüsusi exception-lar, `GlobalExceptionHandlerMiddleware`, `TimeProvider`.
 - Infrastructure: EF Core 10 + SQL Server (`.\SQLEXPRESS`), qlobal soft delete filtri, filtrli unikal indekslər, tool-generated migration, `Generic Repository` + `UnitOfWork`, seed.
 - Seed (demo data): 7 aeroport, 4 aviaşirkət, 8 təyyarə (DEMO-xxx), 1488 oturacaq, 60 günlük reyslər (hub əsaslı, üst-üstə düşmə yoxdur), ikitərəfli marşrut əhatəsi yoxlanılıb.
 - Gün 8: uçuş axtarışı və reys detalı (CQRS handler, `FlightsController`).
-- **Gün 9 (TAMAMLANDI):** axtarış SQL-də yenidən yazıldı (proyeksiya, alt sorğu ilə boş yer sayı, `passengersCount` filtri `OFFSET`-dən əvvəl, 2 komanda: data + `COUNT`, `Scheduled`/`Delayed` satılabilir, `PageSize` ≤ 50), fail-fast saat qurşağı, real SQL Server inteqrasiya test bazası (`AirlineReservationDb_Test`), Scalar + XML şərhləri. Commit-lər: `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`.
-- **Gün 10 (TAMAMLANDI):** `ThenBy(f => f.Id)` tie-break, `TicketSpecifications` vahid aktiv bilet qaydası, `Airport.Aliases` + miqrasiya + seed, aviaşirkət adları yeniləndi, `GET /api/v1/airports?search=` və `GET /api/v1/airlines` endpoint-ləri + unit və inteqrasiya testləri (`36f4648`).
-- **Gün 11 (TAMAMLANDI):** ASP.NET Core Identity (`AppUser`, `AppRole` yalnız Infrastructure-da), `admin@airline.test` `user-secrets`-dən seed (`EmailConfirmed = true`), test fabriki `user-secrets`-dən təcrid edildi + `_Test` qoruyucusu + `FixedTimeProvider`, `Booking.UserId` məcburi `Guid` + `Restrict` FK (`MakeBookingUserRequired`), 97 test (74 unit + 23 inteqrasiya) yaşıl.
-- **Gün 12 (TAMAMLANDI):** Stateless JWT Bearer auth (`AddIdentityCore` — cookie sxemi yoxdur, tokensiz `401`), `ITokenService` / `JwtTokenService` (`Jwt:Key` `user-secrets`-dən, `TimeProvider` sinxron `LifetimeValidator`), `AuthController` (`register`, `login`, `me`, `admin-check`), Scalar Bearer "Authorize", login-only `AddRateLimiter`, 133 test (96 unit + 37 inteqrasiya) yaşıl.
-- **Gün 13 (TAMAMLANDI):** Vahid `SeatDto` (`Status` mətn enum + `HeldByMe`, `SvgMap` əsas cavabdan çıxarıldı: `147 467 → 66 085` bayt), qlobal `JsonStringEnumConverter`, `Select` + `AsNoTracking` proyeksiya (2 SQL komanda, `Include` yox, SQL `TicketSpecifications.IsActive`), `PricingService` (`ValidateOnStart`, tək qiymət mənbəyi, 72h daxil `AwayFromZero`), `POST /api/v1/bookings/quote` (`[AllowAnonymous]`, `400/404/409` qaydaları), 186 test (135 unit + 51 inteqrasiya) yaşıl. (`/seatmap/svg` köməkçi endpoint kimi saxlanılıb.)
+- **Gün 9 (TAMAMLANDI):** axtarış SQL-də yenidən yazıldı (proyeksiya, alt sorğu ilə boş yer sayı, `passengersCount` filtri `OFFSET`-dən əvvəl, 2 komanda: data + `COUNT`, `Scheduled`/`Delayed` satılabilir, `PageSize` ≤ 50), fail-fast saat qurşağı, real SQL Server inteqrasiya test bazası (`AirlineReservationDb_Test`), Scalar + XML şərhləri. Commit-lər: `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`. Testlər: 62 (58 unit + 4 inteqrasiya).
+- **Gün 10-14 (TAMAMLANDI):** aeroport/aviaşirkət API və alias-lar; Identity (`AppUser`, rollar, admin `user-secrets`-dən, `Booking.UserId` məcburi); JWT və `AuthController` (`AddIdentityCore`, 401); oturacaq xəritəsi JSON müqaviləsi, `PricingService`, `quote`; `SeatHold` (bazada), `seatmap/status`, UTC çeviricisi, `UnitOfWork`-da unikal pozuntusu tərcüməsi, hold təmizlik xidməti.
+- **Gün 15 (TAMAMLANDI):** `PnrGenerator` (32 simvollu əlifba), `CheckoutCommand` + validator, kart datasının maskalanması. Testlər: 298 (233 unit + 65 inteqrasiya).
+- **Gün 16-18 (TAMAMLANDI, düzəlişlər gözləyir):** checkout mühərriki, ödəniş simulyasiyası, PNR axtarışı, "my trips" və ləğv. **Məlum qüsur (Gün 19-un əvvəlində düzəlir):** hold ödənişdən **əvvəl** claim olunmur (eyni istifadəçinin ikiqat göndərməsi kartdan iki dəfə pul çıxara bilər), `ReverseAsync` kompensasiyası yoxdur, `UniqueConstraintViolationException` indeks adını daşımır, hold və sərnişin yerlərinin bərabərliyi yoxlanmır. Gün 17-18 hələ yoxlama kapısından keçməyib. Testlər: 387 (306 unit + 81 inteqrasiya).
+- Köhnə plana görə **erkən yazılıb** (Gün 9-da yoxlanılır, Gün 13-də təmizlənir): oturacaq xəritəsi `GET /api/v1/flights/{id}/seatmap` (strukturlu JSON) və server tərəfli SVG köməkçi endpoint-i.
 
 ## 2. Dəyişməz qərarlar
 
@@ -70,6 +70,19 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 ### Gün 9: Axtarış sorğusunun düzəldilməsi, inteqrasiya test bazası və Scalar (TAMAMLANDI)
 **Branch:** `fix/flight-search-polish`
 **Nəticə:** commit-lər `cad120d`, `4f1bf77`, `a3c7ce3`, `5fafc5d`; 62 test yaşıl. Qalan 2 kiçik iş Gün 10-a keçdi.
+**Yoxlama nəticəsi (görülüb):** `8d6882a` `develop`-dadır; Bakı günü sərhədi düzgündür (`startUtc` 20:00 UTC); tək SQL komandası; pasport `Trim()` və `static readonly Regex` düzgündür; `AirlineId` və `MaxStops` filtrləri var.
+**Düzəldilməli (SQL logundan görünən):**
+- [x] **Sərnişin sayı filtri SQL-də olmalıdır.** İndi səhifələmədən sonra yaddaşda süzülür (səhifələr və say səhvdir). Boş yer sayı SQL-də hesablanır (`Aircraft.TotalSeats` − aktiv biletlər) və `>= passengersCount` şərti `OFFSET`-dən **əvvəl** tətbiq olunur
+- [x] **Sorğu ağırdır:** hər reysin bütün bilet və rezervasiyaları yüklənir (`Include`). `Select` proyeksiyası + `AsNoTracking`, boş yer sayı alt sorğu ilə, yalnız DTO üçün lazım olan sütunlar
+- [x] **Satılabilən statuslar:** `Scheduled` və `Delayed` (indi yalnız `Scheduled`, gecikmiş reyslər çıxır). `Cancelled`, `Departed`, `InAir`, `Landed` çıxarılır
+- [x] **`TotalCount`:** `PagedResult` üçün ayrıca `CountAsync` (eyni filtrlərlə), yaddaşdakı səhifədən hesablama yoxdur
+- [x] **Fail-fast həqiqətən işləməlidir:** `ResolveTimeZone` tapılmayanda səssiz UTC qaytarırdı. Başlanğıc üçün `GetRequiredTimeZone` (tapılmasa `InvalidOperationException`). Səhv ad (`Asia/Bakuu`) ilə sınaqdan keçir, tətbiq dayanmalıdır
+- [x] `PageSize` maksimumu 50
+- [x] Gün saatı (səhər/günorta/axşam) filtri **planda yoxdur** (F3 tələb etmir). Çeşidləmə: qiymət, çıxış vaxtı, müddət
+- [x] **İnteqrasiya test bazası:** `tests/AirlineReservation.IntegrationTests` (real SQL Server, `AirlineReservationDb_Test`, migration ilə yaradılır, testlər öz datasını yaradır və təmizləyir). İlk testlər: 1 boş yeri qalan reys 2 sərnişin üçün çıxmır; səhifə ölçüsü və `TotalCount` düzgündür; `Delayed` reys görünür, `Cancelled` görünmür. Bu infrastruktur Gün 14 və 16-da da istifadə olunacaq
+- [x] **Scalar:** daxili OpenAPI + `Scalar.AspNetCore`, XML şərhləri, mövcud endpoint-lərdə (flights, seatmap) `ProducesResponseType<ApiResponse<T>>`
+**Commit-lər:** `perf(flights): count available seats in sql and project search results`, `fix(flights): apply passenger count filter before paging`, `fix(flights): keep delayed flights searchable`, `fix(flights): return total count with paged results`, `fix(api): fail fast on unknown business timezone`, `test(flights): add sql server integration tests for search`, `feat(api): add openapi and scalar documentation`
+**Bitmə meyarı:** axtarış bir proyeksiya sorğusu və bir `COUNT` ilə işləyir, səhifələmə və say düzgündür, səhv zona adı ilə tətbiq başlamır, Scalar `/scalar`-da açılır.
 
 ### Gün 10: Aeroport və aviaşirkət API, alias, reseed (TAMAMLANDI)
 **Branch:** `feat/airports-airlines-api`
@@ -78,7 +91,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [x] Aviaşirkət adları: "Azerbaijan Airlines (AZAL)", "Turkish Airlines", "Emirates", "Lufthansa". Dev bazasını sıfırla (`dotnet ef database drop -f`) və yenidən seed et
 - [x] `GET /api/v1/airports?search=` (IATA, ad, şəhər, alias; hərf registrinə həssas deyil; max 10; boş axtarış şəhər üzrə ilk 10). CQRS query, validator (uzunluq ≤ 50), `ApiResponse<List<AirportDto>>`. `GET /api/v1/airlines`. XML şərhləri və `ProducesResponseType`
 - [x] Testlər: handler və validator unit testləri; inteqrasiya testləri (`Bakı`, `baku`, `Баку`, `GYD`, `ist`, `Sabiha` düzgün aeroportu tapır, tanımayan mətn boş siyahı qaytarır, xəta yox)
-**Commit-lər:** `fix(flights): add deterministic tie-break to flight ordering`, `refactor(flights): share active ticket rule between search and seat map`, `feat(airports): add airport aliases with migration and seed`, `feat(airports): add airport search endpoint`, `feat(airlines): add airlines endpoint`, `test(airports): cover alias search` (`develop`-a merge: `36f4648`)
+**Commit-lər:** `fix(flights): add deterministic tie-break to flight ordering`, `refactor(flights): share active ticket rule between search and seat map`, `feat(airports): add airport aliases with migration and seed`, `feat(airports): add airport search endpoint`, `feat(airlines): add airlines endpoint`, `test(airports): cover alias search`
 **Bitmə meyarı:** autocomplete `Bakı`, `Баку`, `ist` üçün düzgün aeroportları qaytarır, axtarış və xəritə eyni boş yer sayını göstərir.
 
 ### Gün 11: ASP.NET Core Identity (TAMAMLANDI)
@@ -86,9 +99,9 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [x] `AppUser : IdentityUser<Guid>`, `AppRole`, rollar `Admin` və `Customer` (Infrastructure, Domain Identity-ni tanımır)
 - [x] Admin hesabı seed: **parol yalnız `user-secrets`/mühit dəyişənindən** (`Seed:AdminPassword`), `appsettings`-də yoxdur; parol yoxdursa xəbərdarlıq və atlama (default parol yoxdur). E-poçt qeyri-məxfi konfiqurasiyadan, ayrılmış test domeni (`admin@airline.test`), `EmailConfirmed = true`. README-də "yalnız demo" və parol nümunəsi yoxdur
 - [x] İnteqrasiya test fabriki admin e-poçtunu və test parolunu **özü konfiqurasiya override ilə verir** (`user-secrets`-ə güvənmir, test təkrarlanandır)
-- [x] `Booking.UserId` **məcburi `Guid`** (nullable deyil, qonaq rezervasiyası yoxdur) + Infrastructure konfiqurasiyasında `AspNetUsers`-ə FK (`Restrict`) və indeks (`MakeBookingUserRequired` yeni migration)
+- [x] `Booking.UserId` **məcburi `Guid`** (nullable deyil, qonaq rezervasiyası yoxdur) + Infrastructure konfiqurasiyasında `AspNetUsers`-ə FK (`Restrict`) və indeks. Əgər əvvəl nullable yazılıbsa, ayrıca yeni migration ilə düzəlt (köhnə migration-a toxunma)
 - [x] Migration (alətlə), `has-pending-model-changes` exit 0
-**Commit-lər:** `92c2a0e`, `504d87e`, `9bfbaba`, `b647578`, `53d8418`, `5ccefb3`, `93ca12d`, `3c24ab3`
+**Commit-lər:** `feat(infra): add identity user and roles`, `feat(infra): seed admin from user secrets`, `feat(infra): link booking user to identity`
 **Bitmə meyarı:** Identity cədvəlləri bazadadır, admin hesabı secret-dən yaranır.
 
 ### Gün 12: JWT və `AuthController` (TAMAMLANDI)
@@ -99,62 +112,70 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [x] `[Authorize]` və `[Authorize(Roles = "Admin")]`; Scalar-da Bearer "Authorize"
 - [x] Yalnız login üçün daxili rate limiter (`AddRateLimiter`)
 - [x] Testlər: token claim-ləri, səhv parol, rol yoxlaması. **Saat:** token verilməsi və yoxlanması **eyni `TimeProvider`-i** istifadə edir (dondurulmuş test saatı ilə real saat qarışmır), vaxtı bitmiş token 401 verir. Testlər real saata və sabit təqvim tarixinə bağlı olmamalıdır
-**Commit-lər:** `c0d044e`, `18c7c4f`, `c885e39`, `1d6295e`, `bd62811`
+**Commit-lər:** `feat(auth): add jwt token service`, `feat(api): add register login and me endpoints`, `feat(api): add login rate limiter`, `test(auth): cover token and role checks`
 **Bitmə meyarı:** Scalar-da qeydiyyat, giriş, token ilə `me` işləyir, qorunan endpoint tokensiz 401 verir.
 
 ### Gün 13: Oturacaq xəritəsi müqaviləsinin təmizlənməsi, qiymət və quote (TAMAMLANDI)
 **Branch:** `feat/seatmap-contract-and-pricing`
-`GET /api/v1/flights/{id}/seatmap` xəritə müqaviləsi, proyeksiya, `PricingService` və `quote` endpoint-i tamamlandı.
-- [x] `SeatMapDto` müqaviləsi: qlobal `JsonStringEnumConverter`, vahid `SeatDto` (`Status`: `Available`/`Occupied`/`Held`/`Blocked`, `HeldByMe` Gün 14-ə qədər `false` XML şərhi ilə), **`SvgMap` əsas cavabdan çıxarıldı** (`147 467 → 66 085` bayt; `/seatmap/svg` saxlanılıb) + xəritə müqavilə testləri
-- [x] Doluluq sorğusu: `.Include()` olmadan `Select` + `AsNoTracking` proyeksiyası, SQL-ə çevrilən `TicketSpecifications.IsActive` `Expression`-i, runtime EF logu ilə **2 SQL komandası** sübutu
-- [x] `PricingService`: `round((flightBasePrice × seatMultiplier + positionFee) × demandMultiplier, 2, AwayFromZero)` (`WindowFee` > `AisleFee` > `0`, `(departureUtc - utcNow) <= LastMinuteDays × 24h` daxil), `PricingSettings` `ValidateOnStart`, `TimeProvider` 72h/72h01m testləri (17 test halı) və xəritə handler-də tək qiymət mənbəyi
-- [x] `POST /api/v1/bookings/quote` (`[AllowAnonymous]`, məlumat xarakterli — checkout yenidən hesablayır, `TotalPrice` = yuvarlaqlaşdırılmış sətirlərin cəmi; `400` başqa təyyarə/validasiya, `404` naməlum reys/oturacaq, `409` satılmayan reys/tutulmuş yer nömrələri) + 21 validator/handler testi
-- [x] İnteqrasiya testləri: Boeing 777 `3-4-3` (`I` olmadan), canlı `/quote` vs `/seatmap` 1:1 qiymət uyğunluğu və xəta kodları, `PricingSettings` startup `ValidateOnStart` (186/186 test yaşıl)
-**Commit-lər:** `13a15b1`, `b3c2694`, `aaf76f5`, `980569e`, `2d6a85f`
+`GET /api/v1/flights/{id}/seatmap` artıq var (köhnə Gün 9). Bu gün onu **kilid və blokla uyğun** edirik.
+- [x] `SeatMapDto` müqaviləsi: `bool IsOccupied` → `Status` (`Available`, `Occupied`, `Held`, `Blocked`, JSON-da mətn kimi, `JsonStringEnumConverter`) və `heldByMe` (token varsa). **`SvgMap` əsas cavabdan çıxarılır** (hər sorğuda yüzlərlə oturacağın SVG sətri göndərmək lazımsızdır; server tərəfli SVG ayrıca endpoint kimi qala bilər, Client xəritəni JSON-dan çəkir). `FlightSeatDto` adı `SeatDto` olur (`FlightSeat` entity-si yoxdur)
+- [x] Doluluq sorğusu yalnız aktiv biletləri sayır (ləğv, silinmiş, `Cancelled` rezervasiya çıxarılır, bu hissə var). Bütün uçuşu bilet və rezervasiyalarla yükləmək əvəzinə **`Select` proyeksiyası** ilə tək sorğu
+- [x] `PricingService`: `BasePrice × Seat.PriceMultiplier` (business, exit row), pəncərə/keçid əlavə haqqı (konfiqurasiya), son 3 gündə tələbat çarpanı (default ×1.2). Xəritədəki `Price` **yalnız bu servisdən** gəlir (iki ayrı qiymət məntiqi olmasın)
+- [x] `POST /api/v1/bookings/quote` (flightId, seatIds) → sətir-sətir döküm və yekun
+- [x] Testlər: xəritə statusları, table-driven qiymət testləri (economy, business, exit row, pəncərə, tələbat, yuvarlaqlaşdırma)
+**Commit-lər:** `refactor(seats): replace occupied flag with seat status and drop svg from main dto`, `perf(seats): project seat map in a single query`, `feat(pricing): add pricing service with configurable fees`, `feat(bookings): add quote endpoint`, `test(pricing): add table driven pricing tests`
 **Bitmə meyarı:** 777 üçün 3-4-3 xəritə `Status` ilə qayıdır, quote düzgün rəqəmlər verir.
 
-### Gün 14: Oturacaq kilidi (`SeatHold`, bazada)
+### Gün 14: Oturacaq kilidi (`SeatHold`, bazada) (TAMAMLANDI)
 **Branch:** `feat/seat-hold`
-- [x] `SeatHold` entity (`FlightId`, `SeatId`, `UserId`, `ExpiresAtUtc`), **soft delete yoxdur** (fiziki silinir), `(FlightId, SeatId)` üzərində **filtrsiz unikal indeks**, `(FlightId, UserId)` kompozit indeksi, `ExpiresAtUtc` indeksi, Restrict FK-lar, migration `AddSeatHoldTable`, `has-pending-model-changes` exit 0, UTC DateTime converter ilə ISO 8601 trailing 'Z' təminatı
-- [x] SQL 2601/2627 unikal xətalarının UnitOfWork-də tutulub `UniqueConstraintViolationException`-a tərcüməsi, handler-də mənalı `ConflictException` (409) atılması
-- [x] `POST /api/v1/flights/{id}/holds` `[Authorize]`, body `{ seatIds: [] }`, **atomik** (hamısı və ya heç biri), 1-9 yer. Tranzaksiyada: (1) bu istifadəçinin başqa reyslərdəki hold-larını burax (hold-spam qoruması), (2) seçilmiş yerlərin **vaxtı keçmiş hold-larını sil** (Hold qaydası), (3) yerlərin həmin təyyarəyə aid olduğunu, aktiv biletlə dolu olmadığını və başqası tərəfindən tutulmadığını yoxla, (4) istifadəçinin bu reysdəki əvvəlki hold-larını əvəzlə, (5) yaz. Unikal indeks pozuntusunda rollback və 409. `ExpiresAtUtc = TimeProvider + Hold:Minutes` (default 10)
-- [x] `GET /api/v1/flights/{id}/holds/mine` (server tərəfindən hesablanmış `RemainingSeconds` ilə), `DELETE /api/v1/flights/{id}/holds` (öz hold-larını idempotent burax)
-- [x] Xəritə: başqasının aktiv hold-u `Held`, öz hold-u `Held` + `heldByMe = true`, prioritet: `Blocked > Occupied > Held > Available`
-- [x] Yüngül status yeniləmə endpoint-i: `GET /api/v1/flights/{id}/seatmap/status` (yalnız Available olmayan yerlər və `generatedAtUtc`, eyni `SeatStatusResolver` qaydası ilə 100% status pariteti; ictimai girişdə etibarsız/keçmiş token ilə 200 `heldByMe = false`)
-- [x] `HoldCleanupService` (`BackgroundService`, hər 30 san, vaxtı keçmişləri `ExecuteDeleteAsync` ilə silir, hər iterasiya `try/catch` ilə təcrid edilib, `Hold:CleanupEnabled` konfiqurasiyası)
-- [x] Testlər: 20 dövr paralel inteqrasiya testi (start gate ilə hər dövr dəqiq bir 200 və bir 409, bazada 1 sətir), vaxtı bitmiş hold götürülür (`MutableTimeProvider` 10 dəq irəli), rollback köhnə hold-ları saxlayır, başqa təyyarə 400, biletli yer 409, axtarış boş yer sayı = xəritədə Available + Held (250/250 test yaşıl)
-**Commit-lər:** `57f7835`, `461b4bf`, `eb9000f`, `7e8def9`, `00971e8`, `68207c9`, `eddef51`
+- [x] `SeatHold` entity (`FlightId`, `SeatId`, `UserId`, `ExpiresAtUtc`, `CreatedAtUtc`), `BaseEntity`-dən miras almır, **soft delete yoxdur** (fiziki silinir; qlobal soft-delete filtri dövrü onu keçir). `(FlightId, SeatId)` üzərində **filtrsiz unikal indeks**, `(FlightId, UserId)` kompozit və `ExpiresAtUtc` indeksləri. FK-lar `Flight`, `Seat`, `AspNetUsers` (hamısı `Restrict`). Migration (alətlə), `has-pending-model-changes` exit 0
+- [x] **UTC işarəsi:** EF-də bütün `DateTime` sahələri üçün UTC `ValueConverter` (`ConfigureConventions`), JSON-da vaxtlar `Z` ilə bitir (indi `Unspecified` olduğu üçün `Z` ola bilmir və brauzer yerli vaxt kimi oxuyur). Test: xam JSON-da `departureTimeUtc` və `expiresAtUtc` `Z` ilə bitir
+- [x] **Unikal pozuntusunun tərcüməsi:** `UnitOfWork` `SqlException` 2601/2627-ni Application-da təyin olunmuş `UniqueConstraintViolationException`-a çevirir (Application `SqlClient`-i tanımır), handler mənalı `ConflictException` atır. Hər `DbUpdateException` 409 olmur
+- [x] `POST /api/v1/flights/{id}/holds` `[Authorize]`, body `{ seatIds: [] }`, **atomik** (hamısı və ya heç biri), ≤ 9 yer. Tranzaksiyada: (1) bu istifadəçinin həmin reysdəki köhnə hold-larını burax, (2) seçilmiş yerlərin **vaxtı keçmiş hold-larını sil** (Hold qaydası), (3) reysin satılabilən olduğunu (`Scheduled`/`Delayed`, qalxış gələcəkdə) və yerlərin həmin təyyarəyə aid olduğunu, aktiv biletlə dolu və ya bloklu olmadığını yoxla, (4) yaz. **Bir istifadəçinin eyni anda yalnız bir reysdə hold-u olur** (yeni reysdə hold alanda köhnə reysin hold-ları buraxılır). Konfliktdə tranzaksiya geri çəkilir, istifadəçinin köhnə hold-ları qalır Unikal indeks pozuntusu → `ConflictException` (409). `ExpiresAtUtc = TimeProvider + Hold:Minutes` (default 10), **uzatma yoxdur**
+- [x] `GET /api/v1/flights/{id}/holds/mine` (`expiresAtUtc` və **`remainingSeconds`**, serverin saatı ilə), `DELETE /api/v1/flights/{id}/holds` (yalnız **öz** hold-larını burax, hold olmayanda da uğurlu)
+- [x] Xəritə: başqasının aktiv hold-u `Held`, öz hold-u `Held` + `heldByMe = true`
+- [x] **Polling üçün yüngül endpoint:** `GET /api/v1/flights/{id}/seatmap/status` yalnız `Held`/`Occupied`/`Blocked` yerlərin `seatId` və statusunu qaytarır. Client tam xəritəni **bir dəfə** yükləyir, sonra yalnız statusu yeniləyir (66 KB-lıq tam cavab hər 8 saniyədən bir getməsin)
+- [x] `HoldCleanupService` (`BackgroundService`, hər 30 san, `ExecuteDeleteAsync`, `TimeProvider`, hər dövr üçün scope, **hər iterasiya `try/catch`** ki, istisna tətbiqi dayandırmasın, interval və `Hold:CleanupEnabled` konfiqurasiyada, test fabrikində söndürülür)
+- [x] **Status qaydası:** prioritet `Blocked` > `Occupied` > `Held` > `Available`. Tam xəritə və `seatmap/status` **eyni sorğu köməkçisini** istifadə edir. Status endpoint-i yalnız `Available` olmayanları qaytarır və `generatedAtUtc` əlavə edir. Etibarsız/vaxtı keçmiş tokenlə ictimai `/seatmap` 401 yox, **200** qaytarır (`heldByMe = false`). Axtarışdakı boş yer sayı = xəritədə `Available + Held`
+- [x] Testlər (hər addımla birlikdə): iki istifadəçi eyni yeri kilidləyir (biri 409), vaxtı bitmiş hold götürülür (**dəyişdirilə bilən** saat, JWT-nin istifadə etdiyi saatla eyni), 9-dan çox yer rədd, konfliktdə köhnə hold-lar qalır (rollback), başqa təyyarənin yeri 400, aktiv biletli yer 409, öz hold-unu yenidən seçmək əvəz edir, `DELETE` başqasının hold-una toxunmur, xəritə və status endpoint-i eyni statusları göstərir. **Paralel inteqrasiya testi** (real SQL Server test bazası): başlanğıc darvazası ilə eyni anda, 20 dəfə təkrar, sonda bazada həmin yer üçün dəqiq bir sətir. `ClearTestDataAsync`-ə `SeatHolds` əlavə olunur
+- [x] Scalar: 4 endpoint üçün XML təsvirləri, `401/409` cavab tipləri
+**Commit-lər:** `feat(domain): add seat hold entity`, `feat(infra): add seat hold configuration and migration`, `feat(seats): add atomic multi seat hold command`, `feat(seats): add release and my holds endpoints`, `feat(seats): add hold cleanup background service`, `test(seats): cover hold conflicts expiry and parallel access`
 **Bitmə meyarı:** iki hesabla eyni yeri kilidləməyə çalışanda biri 409 alır, vaxt bitəndə yer azad olur, restart kilidləri silmir.
 
 ### Gün 15: PNR və checkout validatoru (TAMAMLANDI)
 **Branch:** `feat/pnr-and-checkout-validation`
-- [x] `PnrGenerator` (`RandomNumberGenerator.GetItems`, 6 simvol, 32-lik əlifba, `0/O/1/I` yoxdur); pure, testable, DI qeydiyyatı
-- [x] `CheckoutCommandValidator`: sərnişin sayı 1-9, unikal oturacaqlar, `PassengerValidator` təkrar istifadəsi (`\p{L}` Azərbaycan adları: Əli, Nərgiz, Şükür), pasport, `IBusinessTime` ilə doğum tarixi, əlaqə (email, telefon), kart təhlükəsizliyi (maskalanmış ToString, echo qadağası, MM/YY cari aydan əvvəl olmamaq, CVV 3-4 rəqəm, bütün mətn sahələrinə MaximumLength limitləri)
-- [x] Testlər: 100 000 PNR nümunəlik test, icazəli simvollar və format, kart maskalama testləri, MaximumLength və validator halları (302/302 test yaşıl)
-**Commit-lər:** `5d6e197`, `bf2bd54`, `d71253e`
-**Bitmə meyarı:** testlər yaşıldır.
+- [x] `IPnrGenerator` + `PnrGenerator`: `RandomNumberGenerator` (ədalətli seçim, `RandomNumberGenerator.GetItems`, modulo qərəzi yoxdur), 6 simvol, 32 simvollu əlifba: hərflər `I` və `O` olmadan, rəqəmlər `2-9` (`0` və `1` yoxdur). Generator saf funksiyadır. **Unikal pozuntusunda təkrar cəhd Gün 16-dadır** (checkout handler-i, `UniqueConstraintViolationException`)
+- [x] `CheckoutCommand` forması: `FlightId`, `Passengers[]` (hər birində `SeatId`), əlaqə (`email`, `phone`), `Card` (`number`, `expiry` MM/YY, `cvv`). `UserId` sorğu gövdəsində **yoxdur**, tokendən gəlir
+- [x] `CheckoutCommandValidator`: sərnişin sayı 1-9, hər sərnişin `PassengerValidator`-dan keçir (Azərbaycan adları, pasport), `SeatId`-lər təkrarlanmır, əlaqə formatları, kart formatı (nömrə uzunluğu və rəqəmlər, `expiry` formatı və bu aydan əvvəl deyil (`IBusinessTime`), `cvv` 3-4 rəqəm). Luhn Gün 17-dədir. Hold və reys yoxlamaları (verilənlər bazası) handler-dədir (Gün 16)
+- [x] **Kart datası təhlükəsizliyi:** kart modelinin `ToString()` və log çıxışı maskalanır; validasiya xəta mesajları daxil edilən dəyəri **təkrarlamır**; global exception handler sorğu gövdəsini loglamır. Test: `command.ToString()` kart nömrəsini və CVV-ni ehtiva etmir
+- [x] Testlər (addımla birlikdə): PNR formatı (uzunluq, icazəli simvollar, qadağan simvollar yoxdur, 100 000 nümunə), validator halları (Azərbaycan adları daxil)
+**Commit-lər:** `feat(bookings): add pnr generator`, `feat(bookings): add checkout command with validator`, `test(bookings): cover pnr and checkout validation`
+**Bitmə meyarı:** testlər yaşıldır, kart datası `ToString()`-də görünmür.
 
-### Gün 16: Checkout mühərriki (ən kritik gün)
+### Gün 16: Checkout mühərriki (ən kritik gün) (TAMAMLANDI, düzəlişlər Gün 19-da)
 **Branch:** `feat/checkout-engine`
-- [x] `CheckoutCommand` + handler, `IUnitOfWork` tranzaksiyası. Addımlar: (1) istifadəçinin bu reysdəki hold-larını yüklə, **vaxtı bitməyibsə** davam et (əks halda 409 "kilidin vaxtı bitib"), (2) yerlərin hələ aktiv biletlə dolu olmadığını yoxla, (3) yekun qiyməti `PricingService`-dən hesabla (müştərinin göndərdiyinə etibar yox), (4) `IPaymentGateway` çağır (bu gün müvəqqəti həmişə-uğurlu stub), (5) `Passenger`, `Ticket`, `Booking (Confirmed, PNR)`, `Payment` yaz, (6) hold-ları sil, commit
-- [x] Unikal indeks pozuntusu → 409. PNR toqquşması → təkrar cəhd
-- [x] `POST /api/v1/bookings/checkout` `[Authorize]`
-- [x] Hold-u olmayan və ya başqasının hold-u ilə checkout rədd edilir
-- [x] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdursa rədd; vaxtı bitmiş hold ilə rədd; uğurlu checkout biletləri və PNR yaradır, hold-lar silinir; **paralel iki checkout eyni oturacaq üçün yalnız biri uğurlu**; 400 cavab gövdəsində və test logger çıxışında kart nömrəsi və CVV axtarışı (AttemptedValue sızmaması yoxlanışı)
-**Commit-lər:** `feat(payments): add payment gateway abstraction and stub`, `feat(bookings): add checkout command handler consuming seat holds`, `feat(api): add checkout endpoint to bookings controller`, `test(bookings): add checkout integration and concurrency tests`
-**Bitmə meyarı:** Scalar-da hold → checkout → PNR işləyir, paralel test keçir, 322 test hamısı yaşıldır.
+- [ ] `IPaymentGateway` (`ChargeAsync`, `ReverseAsync`) + müvəqqəti həmişə-uğurlu `StubPaymentGateway` (real simulyasiya Gün 17-dədir). `PaymentProcessRequest`-in `ToString()` və log çıxışı kart datasını maskalayır
+- [ ] `CheckoutCommand` handler axını, **hamısı bir `IUnitOfWork` tranzaksiyasında**: (1) reys satılabilən olmalıdır (404/409); (2) istifadəçinin bu reysdəki **bütün** hold-larını yüklə (vaxtı bitmişlər də, düzgün xəta mesajı üçün); sərnişinlərin `SeatId` çoxluğu hold çoxluğuna **bərabər olmalıdır** (əks halda 409); vaxtı bitmiş hold üçün ayrıca mesaj; (3) **hold-ları atomik "claim" et:** hold `Id`-ləri üzrə `ExecuteDeleteAsync`, silinən sətir sayı hold sayına bərabər olmalıdır (əks halda başqa sorğu artıq götürüb, 409, ödəniş çağırılmır). Eyni istifadəçinin iki dəfə basması beləcə ikiqat ödənişə yol vermir; (4) yerlərin aktiv biletlə dolu olmadığını **`TicketSpecifications.IsActive`** ilə yoxla (öz `IsCancelled` yoxlamanı yazma); (5) qiyməti `PricingService`-dən hesabla (müştərinin göndərdiyinə etibar yox); (6) PNR: `IPnrGenerator` ilə, `AnyAsync` ilə yoxlayaraq ən çox 5 cəhd (**ödənişdən əvvəl**); (7) `ChargeAsync`, rədd olarsa tranzaksiya geri çəkilir (claim də geri çəkilir, hold-lar qayıdır); (8) `Booking (Confirmed)`, `Passenger`, `Ticket`, `Payment` yaz, commit
+- [ ] **Kompensasiya:** ödəniş uğurlu olub sonrakı addım (yazma, commit) uğursuz olarsa `ReverseAsync` çağırılır (best effort, loglanır, kart datası yoxdur). `UniqueConstraintViolationException` indeksin **adını** daşıyır: PNR indeksi → 409 "yenidən cəhd et", bilet indeksi → 409 "oturacaq tutulub" (ikisində də kompensasiya). Deadlock (1205) bir dəfə təkrar cəhd olunur
+- [ ] `TicketNumber` generasiyası: `{pnr}-{sıra}` (PNR unikal olduğu üçün unikaldır)
+- [ ] `CheckoutCommand`-a isteğe bağlı `ExpectedTotalAmount`: göndərilibsə və serverin hesabladığından fərqlidirsə **409 `PriceChanged`** (yeni yekunla), ödəniş çağırılmır. İstifadəçi görmədiyi məbləği ödəmir
+- [ ] `CheckoutResultDto` (pnr, rezervasiya id, yekun, biletlər, reys xülasəsi; kart datası yoxdur). `POST /api/v1/bookings/checkout` `[Authorize]`, uğurlu cavab **201**. `UserId` tokendən gəlir (`ClaimTypes.NameIdentifier`). XML + `ProducesResponseType` (201, 400, 401, 409)
+- [ ] **400 cavabı daxil edilən dəyərləri təkrarlamır** (kart nömrəsi, CVV, `ValidationFailure.AttemptedValue`). Bütün mətn sahələrinin maksimum uzunluğu var (ad, soyad, pasport, email, telefon, kart sahibi)
+- [ ] **İnteqrasiya testləri** (real SQL Server test bazası): hold yoxdur → 409; vaxtı bitmiş hold → 409; başqasının hold-u → 409; başqa reysdəki hold → 409; sərnişin yerləri ≠ hold yerləri → 409; uğurlu checkout (biletlər və PNR yaranır, hold-lar silinir, xəritədə `Occupied`, axtarışda boş yer azalır, bilet qiymətləri xəritə qiymətinə bərabərdir); **eyni istifadəçinin eyni anda iki dəfə göndərməsi** → bir rezervasiya və **bir ödəniş**; iki istifadəçi eyni yer (başlanğıc darvazası, **20 dövr**) → hər dövrdə bir 201 və bir 409; ödəniş rədd edən test gateway → heç nə yazılmır, hold-lar qalır; yazma uğursuz olanda `ReverseAsync` çağırılır; PNR toqquşması (saxta generator əvvəl mövcud PNR-i qaytarır) təkrar cəhdlə uğurlu olur; `ExpectedTotalAmount` uyğunsuzluğu; tokensiz 401; kart nömrəsi və CVV cavabda və log çıxışında yoxdur
+**Commit-lər:** `feat(payments): add payment gateway abstraction and stub`, `feat(bookings): add checkout command consuming seat holds`, `fix(bookings): claim holds atomically before charging`, `feat(bookings): reverse payment when booking write fails`, `feat(api): add checkout endpoint`, `test(bookings): add checkout integration and concurrency tests`
+**Bitmə meyarı:** Scalar-da hold → checkout → PNR işləyir, eyni istifadəçinin ikiqat göndərməsi yalnız bir ödəniş yaradır, paralel test 20 dövrdə keçir.
 
-### Gün 17: Ödəniş simulyasiyası
+### Gün 17: Ödəniş simulyasiyası (TAMAMLANDI)
 **Branch:** `feat/payment-simulation`
-- [x] `IPaymentGateway` + `MockPaymentGateway`: kart nömrəsi (Luhn), bitmə tarixi (keçməyib), CVV formatı. Test kartları: `4111111111111111` uğurlu, `4000000000000002` rədd (Insufficient funds), `4000000000000010` rədd (Lost or stolen)
-- [x] Rədd: rezervasiya yaranmır, hold qalır, aydın xəta mesajı (`ApiResponse`). Uğurlu: `Payment` (məbləğ, status `Success`, saxta istinad kodu `TXN-...`)
-- [x] **Kart datası saxlanılmır və loglanmır** (test ilə təsdiqləndi - PCI DSS)
+- [x] `MockPaymentGateway` (`ChargeAsync`, `ReverseAsync`; interfeys Gün 16-da yaranıb): kart nömrəsi (Luhn), bitmə tarixi (keçməyib), CVV formatı. Test kartları: `4111111111111111` uğurlu, `4000000000000002` rədd
+- [x] Rədd: rezervasiya yaranmır, hold qalır, aydın xəta mesajı (`ApiResponse`). Uğurlu: `Payment` (məbləğ, status `Success`, saxta istinad kodu)
+- [ ] **Kart datası saxlanılmır və loglanmır:** test logger provider ilə bütün log çıxışında kart nömrəsi və CVV axtarılır (tapılmamalıdır), 400/402 cavab gövdəsində də yoxdur, `Payment` cədvəlində kart sahəsi yoxdur
 - [x] README qeydi: real sistemdə ödəniş xarici çağırışdır və tranzaksiyadan kənarda idarə olunur, burada simulyasiya olduğu üçün sadələşdirilib
-- [x] Testlər: uğurlu, rədd, vaxtı keçmiş kart, hold bitdikdən sonra ödəniş cəhdi, təkrar uğurlu cəhd
-**Commit-lər:** `feat(payments): add mock payment gateway with luhn check`, `test(payments): cover payment outcomes and card data safety`
-**Bitmə meyarı:** rədd edilən kartla rezervasiya yaranmır, hold qalır, uğurlu kartla PNR alınır, 343 test yaşıldır.
+- [x] Testlər: uğurlu, rədd, vaxtı keçmiş kart, hold bitdikdən sonra ödəniş cəhdi
+**Commit-lər:** `feat(payments): add mock payment gateway with luhn check`, `feat(bookings): use payment gateway in checkout`, `test(payments): cover payment outcomes and card data safety`
+**Bitmə meyarı:** rədd edilən kartla rezervasiya yaranmır, uğurlu kartla PNR alınır.
 
-### Gün 18: Rezervasiya sorğuları və ləğv
+### Gün 18: Rezervasiya sorğuları və ləğv (TAMAMLANDI)
 **Branch:** `feat/bookings-queries-cancel`
 - [x] `GET /api/v1/bookings/pnr/{pnr}?lastName=` `[AllowAnonymous]` (yalnız baxış), `GET /api/v1/bookings/my?status=upcoming|past|cancelled` (səhifəli)
 - [x] `CancellationPolicy`: uçuşdan >24 saat qalıb 100%, ≤24 saat 50%, uçuş başlayıbsa ləğv yoxdur. `Booking.RefundAmount`, `CancelledAtUtc` + migration
@@ -163,14 +184,28 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Commit-lər:** `feat(bookings): add pnr lookup and my trips queries`, `feat(bookings): add cancellation policy with refund amount`, `feat(bookings): add cancel and cancel preview endpoints`, `test(bookings): cover cancellation boundaries and ownership`
 **Bitmə meyarı:** ləğvdən sonra oturacaq xəritədə boşdur, qaytarma məbləği düzgündür.
 
-### Gün 19: Backend inteqrasiyası (bufer) və `v0.1-backend`
-**Branch:** `chore/backend-integration`
-- [ ] Scalar-da tam ssenari: qeydiyyat → axtarış → xəritə → quote → rezervasiya → ödəniş → my → ləğv
+### Gün 19: Gün 16-18 düzəlişləri, backend inteqrasiyası (bufer) və `v0.1-backend`
+**Branch:** əvvəl `fix/checkout-atomic-claim`, sonra `chore/backend-integration`
+**A. Məcburi düzəlişlər (Gün 16-nın Bölməsinə bax, testdən başla):**
+- [ ] **Qırmızı test əvvəl:** eyni istifadəçi eyni anda iki dəfə checkout göndərir, test gateway `ChargeAsync` çağırışlarını sayır. Hazırkı kodda **2 çağırış** olmalıdır (qüsurun sübutu), sonra düzəliş edilir və test **1** göstərir
+- [ ] Hold-ları ödənişdən əvvəl **atomik claim et** (`ExecuteDeleteAsync`, silinən say hold sayına bərabər olmalıdır, yoxsa 409 və ödəniş çağırılmır). Bütün hold-lar (vaxtı bitmişlər də) yüklənir, sərnişin yerləri hold yerlərinə bərabər olmalıdır
+- [ ] `TicketSpecifications.IsActive` ilə dolu yer yoxlaması, PNR ödənişdən əvvəl (`AnyAsync`, ≤ 5 cəhd)
+- [ ] `UniqueConstraintViolationException.IndexName` (Infrastructure `SqlException` mesajından çıxarır): PNR indeksi və bilet indeksi ayrı-ayrı işlənir
+- [ ] `IPaymentGateway.ReverseAsync` + kompensasiya (ödəniş uğurlu, sonrakı addım uğursuz), `PaymentProcessRequest.ToString()` maskalı
+- [ ] İsteğe bağlı `ExpectedTotalAmount` (409 `PriceChanged`), `TicketNumber = {pnr}-{sıra}`, uğurlu cavab 201
+- [ ] Testlər: ikiqat göndərmə (bir rezervasiya, **bir** ödəniş), paralel iki istifadəçi **20 dövr**, rədd edən gateway hold-ları saxlayır, yazma uğursuz olanda `ReverseAsync`, PNR toqquşması (saxta generator), sərnişin yerləri ≠ hold yerləri, başqa reysdəki hold
+**B. Gün 17-18 yoxlama kapısı (oxu rejimi, sonra düzəliş):**
+- [ ] Ləğv **atomikdir və təkrarlanmır:** iki eyni vaxtlı ləğv sorğusu iki dəfə qaytarma yaratmır (status keçidi şərtli yeniləmə ilə, silinən/yenilənən sətir sayı yoxlanır). Test: paralel iki ləğv, bir qaytarma
+- [ ] PNR axtarışı (`AllowAnonymous`): rate limit və yanlış PNR ilə yanlış soyad üçün **eyni** 404 mesajı (məlumat sızmır)
+- [ ] `MockPaymentGateway`: hansı kartlar uğurlu/rədd, `Payment` cədvəlində kart sahəsi yoxdur, log çıxışında kart datası yoxdur (test)
+- [ ] Ləğv siyasəti sərhədləri (tam 24 saat, qalxmış reys), başqasının rezervasiyası 403/404
+**C. İnteqrasiya (bufer):**
+- [ ] Scalar-da tam ssenari: qeydiyyat → axtarış → xəritə → quote → hold → checkout → my → ləğv
 - [ ] Bug-lar, çatışmayan testlər, `has-pending-model-changes` exit 0, CORS (`AllowClient` Client origin-i ilə)
 - [ ] README: backend işə salma (SQL Server, migration, user-secrets, seed)
-- [ ] `AGENT_RULES.md` və bu plan real vəziyyətə uyğunlaşdırılır (Hold qaydası, tək addımlı checkout)
-- [ ] `develop` → `main` merge, tag `v0.1-backend`
-**Bitmə meyarı:** bütün backend axını Scalar-da sınaqdan keçib.
+- [ ] `AGENT_RULES.md` və bu plan real vəziyyətə uyğunlaşdırılır (Hold qaydası, tək addımlı checkout, claim)
+- [ ] `develop` → `main` merge, tag `v0.1-backend` (**yalnız A və B bitəndən sonra**)
+**Bitmə meyarı:** ikiqat göndərmə yalnız bir ödəniş yaradır, ikiqat ləğv yalnız bir qaytarma yaradır, bütün backend axını Scalar-da sınaqdan keçib.
 
 ### MƏRHƏLƏ B: İstifadəçi saytı (Gün 20-27)
 
@@ -195,7 +230,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 **Branch:** `feat/client-seat-map`
 - [ ] SVG/CSS Grid xəritə JSON-dan çəkilir: sinif bölmələri, cərgə nömrələri, keçid, legend; statuslar (`Available`, `Occupied`, `Held`, `Blocked`) rəngə tək bağlı deyil (ikon/naxış)
 - [ ] Seçim limiti = sərnişin sayı; canlı qiymət (`quote`), sticky xülasə
-- [ ] **"Davam et"** düyməsi `POST .../holds` çağırır (bütün seçilmiş yerlər atomik). 409 olsa "bu yer artıq tutulub" göstərir və xəritəni yeniləyir. Uğurlu olanda **10:00 geri sayım** (`ExpiresAtUtc`-dən) başlayır
+- [ ] **"Davam et"** düyməsi `POST .../holds` çağırır (bütün seçilmiş yerlər atomik). 409 olsa "bu yer artıq tutulub" göstərir və xəritəni yeniləyir. Uğurlu olanda **10:00 geri sayım** serverin qaytardığı **`remainingSeconds`**-dan başlayır (müştəri saatından asılı deyil)
 - [ ] Xəritə 8 saniyədən bir yenilənir (başqalarının hold-ları görünür), səkmə gizli olanda dayanır
 - [ ] "Seçimi dəyiş" → `DELETE .../holds`
 - [ ] Klaviatura və `aria` dəstəyi, mobil üfüqi sürüşdürmə
@@ -205,8 +240,9 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 ### Gün 23: Checkout, ödəniş və PNR təsdiqi (F5, F6)
 **Branch:** `feat/client-checkout`
 - [ ] Sərnişin forması (ad `\p{L}` qaydası ilə, pasport, doğum tarixi, əlaqə), `validators.js`
-- [ ] Geri sayım hold-un `ExpiresAtUtc`-ündən davam edir; bitəndə xəbərdarlıq və xəritəyə qayıdış
+- [ ] Geri sayım serverin `remainingSeconds` dəyərindən davam edir (səhifə yenilənəndə `holds/mine` ilə yenidən alınır); bitəndə xəbərdarlıq və xəritəyə qayıdış
 - [ ] Ödəniş (kart forması, Luhn), **tək `checkout` sorğusu**. Rədd: xəta göstərilir, hold qalır, yenidən cəhd olar. 409 "kilidin vaxtı bitib": xəritəyə qaytar
+- [ ] Qiymət zamana bağlıdır (72 saat sərhədi). Checkout `ExpectedTotalAmount` göndərir. Server 409 `PriceChanged` qaytararsa yeni yekun göstərilir və istifadəçidən yenidən təsdiq istənir
 - [ ] `confirmation.html`: böyük PNR, detallar, çap
 - [ ] Giriş etməmiş istifadəçi login-ə yönləndirilir və geri qayıdır (`guard.js`)
 **Commit-lər:** `feat(client): add passenger form with validation`, `feat(client): add checkout with payment form`, `feat(client): handle expired hold and declined payment`, `feat(client): add pnr confirmation page`, `feat(client): add auth guard with return url`
@@ -250,9 +286,10 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 
 ### Gün 28: Admin MVC skeleti
 **Branch:** `feat/admin-foundation`
-- [ ] Cookie autentifikasiyası, JWT cookie claim-ində; `JwtDelegatingHandler` hər `HttpClient` sorğusuna token əlavə edir; `AddHttpClient<T>()` (API ilə eyni `JsonStringEnumConverter` JSON seçimləri ilə — əks halda mətn enumlar deserializasiya xətası verər)
+- [ ] Cookie autentifikasiyası, JWT cookie claim-ində; `JwtDelegatingHandler` hər `HttpClient` sorğusuna token əlavə edir; `AddHttpClient<T>()`
 - [ ] `AdminOnly` siyasəti, login/logout, layout (Bootstrap 5), `TempData` bildirişləri, səhifələmə partial-ı, `ValidateAntiForgeryToken`, API xətalarını `ModelState`-ə çevirmə
 - [ ] API-də `/api/v1/admin/*` üçün `[Authorize(Roles = "Admin")]`
+- [ ] Admin `HttpClient`-inin JSON seçimləri API ilə **eyni** olmalıdır (`JsonStringEnumConverter`, camelCase). Enum-lar API-də mətn kimi gedir, əks halda `status`, `seatClass` oxunmur. Test: enum sahəli bir cavabı Admin client-i ilə oxu
 - [ ] **Admin heç bir daxili layihəyə istinad etmir** (`.csproj` yoxlanır)
 **Commit-lər:** `feat(admin): add cookie auth with jwt handler`, `feat(admin): add layout and shared partials`, `feat(api): add admin controller base with role policy`
 **Bitmə meyarı:** admin giriş edir, `Customer` admin panelə girə bilmir.
@@ -279,6 +316,7 @@ Format: **Branch**, **Tapşırıqlar**, **Commit-lər**, **Bitmə meyarı**. Hə
 - [ ] Təyyarə sxemi səhifəsi: oturacaq xəritəsi, sinif, çarpan, exit row dəyişmək
 - [ ] Reys səhifəsi: oturacaq xəritəsi, dolu oturacaqda sərnişin adı
 - [ ] **Reys üçün blok:** `FlightSeatBlock` (FlightId, SeatId, Reason) + migration; doluluq sorğusu bloklanmış yerləri `Occupied/Blocked` göstərir; booked olanı bloklamaq olmaz
+- [ ] Axtarışdakı boş yer sayı **bloklanmış yerləri də çıxır**. Qayda saxlanılır: `Search.Available == SeatMap(Available + Held)`, test yenilənir
 - [ ] Testlər: blok və bloklanmış yerin rezerv edilməməsi
 **Commit-lər:** `feat(admin): add aircraft seat template editor`, `feat(seats): add per flight seat blocks`, `feat(admin): add flight seat inventory view`, `test(seats): cover blocked seats`
 **Bitmə meyarı:** admin yeri bloklayır, Client xəritəsində bloklanmış görünür və seçilə bilmir.
